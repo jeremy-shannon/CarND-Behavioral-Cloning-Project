@@ -1,6 +1,7 @@
 import argparse
 import base64
 import json
+import cv2
 
 import numpy as np
 import socketio
@@ -19,11 +20,30 @@ from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_a
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
+# import preprocess from model.py
+#from model import preprocess_image
 
 sio = socketio.Server()
 app = Flask(__name__)
 model = None
 prev_image_array = None
+
+def preprocess_image(img):
+    '''
+    Method for preprocessing images:
+    '''
+    # original shape: 160x320x3, input shape for neural net: 66x200x3
+    # crop to 105x320x3
+    new_img = img[35:140,:,:]
+    # apply subtle blur
+    new_img = cv2.GaussianBlur(new_img, (3,3), 0)
+    # scale to 66x200x3
+    new_img = cv2.resize(new_img,(200, 66), interpolation = cv2.INTER_AREA)
+    # convert to YUV color space (as nVidia paper suggests)
+    new_img = cv2.cvtColor(new_img, cv2.COLOR_BGR2YUV)
+    # normalize
+    new_img = (new_img - 128.) / 128.
+    return new_img
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -37,7 +57,8 @@ def telemetry(sid, data):
     imgString = data["image"]
     image = Image.open(BytesIO(base64.b64decode(imgString)))
     image_array = np.asarray(image)
-    transformed_image_array = image_array[None, :, :, :]
+    img = preprocess_image(image_array)
+    transformed_image_array = img[None, :, :, :]
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.

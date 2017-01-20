@@ -55,7 +55,7 @@ def preprocess_image(img):
     new_img = (new_img - 128.) / 128.
     return new_img
 
-for row in driving_data[0:10]:
+for row in driving_data:
     img = cv2.imread(row[0])
     img = preprocess_image(img)
     X.append(img)
@@ -68,60 +68,34 @@ print(X.shape, y.shape)
 
 model = Sequential()
 
-# Add a convolution layer
-model.add(Convolution2D(24, 5, 5, border_mode='valid', input_shape=(66, 200, 3)))
+# Add three 5x5 convolution layers (output depth 24, 36, and 48), each with 2x2 stride
+model.add(Convolution2D(24, 5, 5, subsample=(2, 2), border_mode='valid', input_shape=(66, 200, 3)))
+model.add(Convolution2D(36, 5, 5, subsample=(2, 2), border_mode='valid'))
+model.add(Convolution2D(48, 5, 5, subsample=(2, 2), border_mode='valid'))
 
-# Add a max pooling layer
-model.add(MaxPooling2D(pool_size=(2, 2), strides=None, border_mode='valid', dim_ordering='default'))
-
-# Add a dropout layer
-model.add(Dropout(0.50))
-
-# Add a ReLU activation layer
-model.add(Activation('relu'))
-
-# Add a convolution layer
-model.add(Convolution2D(36, 5, 5, border_mode='valid'))
-
-# Add a max pooling layer
-model.add(MaxPooling2D(pool_size=(2, 2), strides=None, border_mode='valid', dim_ordering='default'))
-
-# Add a dropout layer
-model.add(Dropout(0.50))
-
-# Add a ReLU activation layer
-model.add(Activation('relu'))
-
-# Add a convolution layer
-model.add(Convolution2D(400, 1, 1, border_mode='valid'))
-
-# Add a dropout layer
-model.add(Dropout(0.50))
-
-# Add a ReLU activation layer
-model.add(Activation('relu'))
+# Add two 3x3 convolution layers (output depth 64, and 64)
+model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+model.add(Convolution2D(64, 3, 3, border_mode='valid'))
 
 # Add a flatten layer
 model.add(Flatten())
 
-# Add a fully connected layer
-model.add(Dense(128))
+# Add three fully connected layers (depth 100, 50, 10), tanh activation
+model.add(Dense(100, activation='tanh'))
+model.add(Dense(50, activation='tanh'))
+model.add(Dense(10, activation='tanh'))
 
-# Add a ReLU activation layer
-model.add(Activation('relu'))
-
-# Add a fully connected layer
-model.add(Dense(84))
-
-# Add a ReLU activation layer
-model.add(Activation('relu'))
-
-# Add a fully connected layer
+# Add a fully connected output layer
 model.add(Dense(1))
 
-# Compile and train the model
-model.compile('adam', 'categorical_crossentropy', ['accuracy'])
-#history = model.fit(X_normalized, y_one_hot, batch_size=128, nb_epoch=12, validation_split=0.2, verbose=2)
+# Add a dropout layer
+#model.add(Dropout(0.50))
+# Add a ReLU activation layer
+#model.add(Activation('relu'))
+
+# Compile and train the model, 
+model.compile('adam', 'mean_squared_error', ['accuracy'])
+history = model.fit(X, y, batch_size=128, nb_epoch=12, validation_split=0.2, verbose=2)
 
 # Save model data
 model.save_weights("./model.h5")
