@@ -15,7 +15,7 @@ tf.python.control_flow_ops = tf
 import csv
 # Import driving data from csv
 with open('./training_data/driving_log.csv', newline='') as f:
-    driving_data = list(csv.reader(f))
+    driving_data = list(csv.reader(f, skipinitialspace=True, delimiter=',', quoting=csv.QUOTE_NONE))
 
 X = []
 y = []
@@ -56,13 +56,42 @@ def preprocess_image(img):
     return new_img
 
 for row in driving_data:
+    # get, process, append center image
     img = cv2.imread(row[0])
     img = preprocess_image(img)
     X.append(img)
-    y.append(row[3])
+    y.append(float(row[3]))
+    # flip horizontally and add inverse steer angle
+    flipped_img = cv2.flip(img, 0 )
+    X.append(flipped_img)
+    y.append(-1.0*float(row[3]))
+    # get, process, append left image
+    imgL = cv2.imread(row[1])
+    imgL = preprocess_image(imgL)
+    X.append(imgL)
+    y.append(float(row[3])+0.15)
+    # flip horizontally and add inverse steer angle
+    flipped_imgL = cv2.flip(imgL, 0 )
+    X.append(flipped_imgL)
+    y.append(-1.0*(float(row[3])+0.15))
+    # get, process, append right image
+    imgR = cv2.imread(row[2])
+    imgR = preprocess_image(imgR)
+    X.append(imgR)
+    y.append(float(row[3])-0.15)
+    # flip horizontally and add inverse steer angle
+    flipped_imgR = cv2.flip(imgR, 0 )
+    X.append(flipped_imgR)
+    y.append(-1.0*(float(row[3])-0.15))
+
 
 X = np.array(X)
-y = np.array(y)    
+y = np.array(y) 
+
+print(np.histogram(y, 3))
+print(np.histogram(y, 5))
+print(np.histogram(y, 7))
+print(np.histogram(y, 9))
 
 print(X.shape, y.shape)
 
@@ -95,7 +124,7 @@ model.add(Dense(1))
 
 # Compile and train the model, 
 model.compile('adam', 'mean_squared_error', ['accuracy'])
-history = model.fit(X, y, batch_size=128, nb_epoch=12, validation_split=0.2, verbose=2)
+history = model.fit(X, y, batch_size=128, nb_epoch=6, validation_split=0.2, verbose=2)
 
 # Save model data
 model.save_weights("./model.h5")
