@@ -86,7 +86,7 @@ def preprocess_image(img):
     return new_img
 
 # Gather data
-for row in driving_data[0:20]:
+for row in driving_data:
     # get, process, append center image
     img = cv2.imread(row[0])
     img = preprocess_image(img)
@@ -119,7 +119,8 @@ for row in driving_data[0:20]:
 X = np.array(X)
 y = np.array(y) 
 
-dataset_to_video(X,y)
+# display the dataset - a sort of sanity check
+#dataset_to_video(X,y)
 
 print(np.histogram(y, 3))
 print(np.histogram(y, 5))
@@ -159,7 +160,7 @@ model.add(Dense(1))
 
 # Compile and train the model, 
 model.compile('adam', 'mean_squared_error', ['accuracy'])
-#history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
+history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
 
 # Save model data
 model.save_weights("./model.h5")
