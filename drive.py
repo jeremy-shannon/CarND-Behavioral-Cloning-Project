@@ -40,7 +40,7 @@ def preprocess_image(img):
     # scale to 66x200x3
     new_img = cv2.resize(new_img,(200, 66), interpolation = cv2.INTER_AREA)
     # convert to YUV color space (as nVidia paper suggests)
-    new_img = cv2.cvtColor(new_img, cv2.COLOR_BGR2YUV)
+    new_img = cv2.cvtColor(new_img, cv2.COLOR_RGB2YUV)
     # normalize
     new_img = (new_img - 128.) / 128.
     return new_img
