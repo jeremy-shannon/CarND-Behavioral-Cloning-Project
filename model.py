@@ -6,7 +6,9 @@ from keras.optimizers import Adam
 import math
 import numpy as np
 from PIL import Image         
-import cv2                                                                       
+import cv2                 
+import matplotlib.pyplot as plt
+                                                      
 
 # Fix error with TF and Keras
 import tensorflow as tf
@@ -87,6 +89,9 @@ def preprocess_image(img):
 
 # Gather data
 for row in driving_data:
+    # toss it out if ~0 speed
+    if float(row[6]) < 0.1:
+        continue
     # get, process, append center image
     img = cv2.imread(row[0])
     img = preprocess_image(img)
@@ -115,17 +120,55 @@ for row in driving_data:
     X.append(flipped_imgR)
     y.append(-1.0*(float(row[3])-0.15))
 
-
 X = np.array(X)
 y = np.array(y) 
 
 # display the dataset - a sort of sanity check
 #dataset_to_video(X,y)
 
-print(np.histogram(y, 3))
-print(np.histogram(y, 5))
-print(np.histogram(y, 7))
-print(np.histogram(y, 9))
+# print a histogram to see which steering angle ranges are most overrepresented
+num_bins = 23
+avg_samples_per_bin = len(y)/num_bins
+hist, bins = np.histogram(y, num_bins)
+width = 0.7 * (bins[1] - bins[0])
+center = (bins[:-1] + bins[1:]) / 2
+plt.bar(center, hist, align='center', width=width)
+plt.plot((np.min(y), np.max(y)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
+plt.show()
+
+# determine keep probability for each bin: if below avg_samples_per_bin, keep all; otherwise keep prob is proportional
+# to number of samples above the average, so as to bring the number of samples for that bin down to the average
+keep_probs = []
+for i in range(num_bins):
+    if hist[i] < avg_samples_per_bin:
+        keep_probs.append(1.)
+    else:
+        keep_probs.append(1./(hist[i]/avg_samples_per_bin))
+
+print(X.shape, y.shape)
+
+# going to have to remove starting from end
+remove_list = []
+
+for i in range(len(X)):
+    for j in range(num_bins):
+        if y[i] > bins[j] and y[i] <= bins[j+1]:
+            # delete from X and y with probability 1 - keep_probs[j]
+            if np.random.rand() > keep_probs[j]:
+                remove_list.append(i)
+
+X = np.delete(X, remove_list, axis=0)
+y = np.delete(y, remove_list)
+
+# print a histogram to see which steering angle ranges are most overrepresented
+#num_bins = 23
+#avg_samples_per_bin = len(y)/num_bins
+hist, bins = np.histogram(y, num_bins)
+width = 0.7 * (bins[1] - bins[0])
+center = (bins[:-1] + bins[1:]) / 2
+plt.bar(center, hist, align='center', width=width)
+plt.plot((np.min(y), np.max(y)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
+plt.show()
 
 print(X.shape, y.shape)
 
@@ -161,6 +204,7 @@ model.add(Dense(1))
 # Compile and train the model, 
 model.compile('adam', 'mean_squared_error', ['accuracy'])
 history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
+print(model.summary())
 
 # Save model data
 model.save_weights("./model.h5")
