@@ -3,32 +3,16 @@ from keras.layers.core import Dense, Activation, Flatten, Dropout
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
 from keras.optimizers import Adam
+from sklearn.model_selection import train_test_split
 import math
 import numpy as np
 from PIL import Image         
 import cv2                 
 import matplotlib.pyplot as plt
                                                       
-
 # Fix error with TF and Keras
 import tensorflow as tf
 tf.python.control_flow_ops = tf
-
-import csv
-# Import driving data from csv
-with open('./training_data/driving_log.csv', newline='') as f:
-    driving_data = list(csv.reader(f, skipinitialspace=True, delimiter=',', quoting=csv.QUOTE_NONE))
-
-X = []
-y = []
-
-def displayCV2(img):
-    '''
-    Utility method to display a CV2 Image
-    '''
-    cv2.imshow('image',img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
 # example of opening/displaying image w/ pillow
 #img = Image.open('test.png')
@@ -39,6 +23,14 @@ def displayCV2(img):
 #cv2.imshow('image',img)
 #cv2.waitKey(0)
 #cv2.destroyAllWindows()
+
+def displayCV2(img):
+    '''
+    Utility method to display a CV2 Image
+    '''
+    cv2.imshow('image',img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 def process_img_for_video(image, angle, frame):
     '''
@@ -87,6 +79,10 @@ def preprocess_image(img):
     return new_img
 
 def random_distort(img):
+    ''' 
+    method for adding random distortion to dataset images, including random brightness adjust, and a random
+    vertical shift of the horizon position
+    '''
     # random brightness
     new_img = img.astype(np.float)
     value = np.random.uniform(-0.5, 0.5)
@@ -105,59 +101,65 @@ def random_distort(img):
     new_img = cv2.warpPerspective(new_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
     return new_img
 
+def generate_training_data(image_paths, angles, validation):
+    '''
+    method for the model training data generator to loadm, process, and distort images
+    if 'validation' is true the image is not flipped or distorted
+    '''
+    while 1:
+        X = []
+        y = []
+        for image_path,angle in zip(image_paths, angles):
+            img = cv2.imread(image_path)
+            img = preprocess_image(img)
+            if not validation:
+                img = random_distort(img)
+                # flip horizontally and add inverse steer angle
+                flipped_img = cv2.flip(img, 1)
+                X.append(flipped_img)
+                y.append(-1.0*float(angle))
+            X.append(img)
+            y.append(angle)
+        Xn = np.array(X)
+        yn = np.array(y)
+        yield (X,y)
+
+import csv
+# Import driving data from csv
+with open('./training_data/driving_log.csv', newline='') as f:
+    driving_data = list(csv.reader(f, skipinitialspace=True, delimiter=',', quoting=csv.QUOTE_NONE))
+
+image_paths = []
+angles = []
 
 # Gather data
 for row in driving_data:
-    # skip it if ~0 speed or < 0.01 steering angle magnitude - not representative of driving behavior
-    if float(row[6]) < 0.1 or abs(float(row[3])) < 0.01:
+    # skip it if ~0 speed - not representative of driving behavior
+    if float(row[6]) < 0.1 :
         continue
-    # get, process, append center image
-    img = cv2.imread(row[0])
-    img = preprocess_image(img)
-    img = random_distort(img)
-    X.append(img)
-    y.append(float(row[3]))
-    # flip horizontally and add inverse steer angle
-    flipped_img = cv2.flip(img, 1)
-    X.append(flipped_img)
-    y.append(-1.0*float(row[3]))
-    # get, process, append left image
-    imgL = cv2.imread(row[1])
-    imgL = preprocess_image(imgL)
-    imgL = random_distort(imgL)
-    X.append(imgL)
-    y.append(float(row[3])+0.2)
-    # flip horizontally and add inverse steer angle
-    flipped_imgL = cv2.flip(imgL, 1)
-    X.append(flipped_imgL)
-    y.append(-1.0*(float(row[3])+0.2))
-    # get, process, append right image
-    imgR = cv2.imread(row[2])
-    imgR = preprocess_image(imgR)
-    imgR = random_distort(imgR)
-    X.append(imgR)
-    y.append(float(row[3])-0.2)
-    # flip horizontally and add inverse steer angle
-    flipped_imgR = cv2.flip(imgR, 1)
-    X.append(flipped_imgR)
-    y.append(-1.0*(float(row[3])-0.2))
+    # get center image path and angle
+    image_paths.append(row[0])
+    angles.append(float(row[3]))
+    # get left image path and angle
+    image_paths.append(row[1])
+    angles.append(float(row[3])+0.2)
+    # get left image path and angle
+    image_paths.append(row[2])
+    angles.append(float(row[3])-0.2)
 
-X = np.array(X)
-y = np.array(y) 
+image_paths = np.array(image_paths)
+angles = np.array(angles)
 
-print(X.shape, y.shape)
-
-# display the dataset - a sort of sanity check
-#dataset_to_video(X,y)
+print(image_paths.shape, angles.shape)
 
 # print a histogram to see which steering angle ranges are most overrepresented
 num_bins = 23
-avg_samples_per_bin = len(y)/num_bins
-hist, bins = np.histogram(y, num_bins)
+avg_samples_per_bin = len(angles)/num_bins
+hist, bins = np.histogram(angles, num_bins)
 width = 0.7 * (bins[1] - bins[0])
 center = (bins[:-1] + bins[1:]) / 2
 plt.bar(center, hist, align='center', width=width)
-plt.plot((np.min(y), np.max(y)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
+plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
 plt.show()
 
 # determine keep probability for each bin: if below avg_samples_per_bin, keep all; otherwise keep prob is proportional
@@ -170,24 +172,32 @@ for i in range(num_bins):
         keep_probs.append(1./(hist[i]/avg_samples_per_bin))
 # going to have to remove starting from end
 remove_list = []
-for i in range(len(X)):
+for i in range(len(angles)):
     for j in range(num_bins):
-        if y[i] > bins[j] and y[i] <= bins[j+1]:
+        if angles[i] > bins[j] and angles[i] <= bins[j+1]:
             # delete from X and y with probability 1 - keep_probs[j]
             if np.random.rand() > keep_probs[j]:
                 remove_list.append(i)
-X = np.delete(X, remove_list, axis=0)
-y = np.delete(y, remove_list)
+image_paths = np.delete(image_paths, remove_list, axis=0)
+angles = np.delete(angles, remove_list)
 
 # print a histogram to see which steering angle ranges are most overrepresented
-hist, bins = np.histogram(y, num_bins)
+hist, bins = np.histogram(angles, num_bins)
 width = 0.7 * (bins[1] - bins[0])
 center = (bins[:-1] + bins[1:]) / 2
 plt.bar(center, hist, align='center', width=width)
-plt.plot((np.min(y), np.max(y)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
+plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
 plt.show()
 
-print(X.shape, y.shape)
+print(image_paths.shape, angles.shape)
+
+image_paths_train, image_paths_test, angles_train, angles_test = train_test_split(image_paths, angles,
+                                                                                  test_size=0.2, random_state=42)
+
+# these lines can be used to sanity check the data if the infinite loop is removed from generate_training_data 
+# and 'yield' is changed to 'return'
+#X,y = generate_training_data(image_paths[0:10],angles[0:10],False)
+#dataset_to_video(X,y)
 
 ###### ConvNet Definintion ######
 
@@ -202,9 +212,6 @@ if not just_checkin_the_data:
     model.add(Convolution2D(36, 5, 5, subsample=(2, 2), border_mode='valid'))
     model.add(Convolution2D(48, 5, 5, subsample=(2, 2), border_mode='valid'))
 
-    # Add a dropout layer
-    model.add(Dropout(0.50))
-
     # Add two 3x3 convolution layers (output depth 64, and 64)
     model.add(Convolution2D(64, 3, 3, border_mode='valid'))
     model.add(Convolution2D(64, 3, 3, border_mode='valid'))
@@ -212,21 +219,26 @@ if not just_checkin_the_data:
     # Add a flatten layer
     model.add(Flatten())
 
-    # Add three fully connected layers (depth 100, 50, 10), tanh activation (and one dropout)
+    # Add three fully connected layers (depth 100, 50, 10), tanh activation (and dropouts)
     model.add(Dense(100, activation='tanh'))
     model.add(Dropout(0.50))
     model.add(Dense(50, activation='tanh'))
+    model.add(Dropout(0.50))
     model.add(Dense(10, activation='tanh'))
+    model.add(Dropout(0.50))
 
     # Add a fully connected output layer
     model.add(Dense(1))
 
-    # Add a ReLU activation layer
-    #model.add(Activation('relu'))
-
     # Compile and train the model, 
-    model.compile('adam', 'mean_squared_error', ['accuracy'])
-    history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
+    model.compile('adam', 'mean_squared_error')
+    #history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
+    history = model.fit_generator(generate_training_data(image_paths_train, angles_train, False), 
+                                  int(len(angles_train)*0.8), 5, verbose=2, 
+                                  validation_data=generate_training_data(image_paths_train, angles_train, True),
+                                  nb_val_samples=int(len(angles_train)*0.2))
+    model.evaluate_generator(generate_training_data(image_paths_test, angles_test, True), len(angles_test))
+
     print(model.summary())
 
     # Save model data
