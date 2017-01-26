@@ -258,7 +258,7 @@ if not just_checkin_the_data:
                                   samples_per_epoch=12800, nb_epoch=5, verbose=2, 
                                   validation_data=generate_training_data(image_paths_train, angles_train, validation_flag=True),
                                   nb_val_samples=1280)
-    print('Test Accuracy', model.evaluate_generator(generate_training_data(image_paths_test, angles_test, validation_flag=True),
+    print('Test Loss:', model.evaluate_generator(generate_training_data(image_paths_test, angles_test, validation_flag=True),
                                                     1280))
 
     print(model.summary())
