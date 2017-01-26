@@ -123,7 +123,7 @@ def generate_training_data(image_paths, angles, batch_size=128, validation_flag=
             y.append(angle)
         yield (np.array(X), np.array(y))
 
-def generate_training_data_for_visualization(image_paths, angles, batch_size=128):
+def generate_training_data_for_visualization(image_paths, angles, batch_size=128, validation_flag=False):
     '''
     method for the model training data generator to load, process, and distort images
     if 'validation_flag' is true the image is not distorted
