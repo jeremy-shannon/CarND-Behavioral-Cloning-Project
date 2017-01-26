@@ -59,16 +59,11 @@ def telemetry(sid, data):
     image_array = np.asarray(image)
     img = preprocess_image(image_array)
     transformed_image_array = img[None, :, :, :]
-    print('in:', steering_angle, throttle)
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
-    #steering_angle = float(model.predict(transformed_image_array, batch_size=1))
-    # Adding a tiny bit of smoothing to the steering_angle: 1 part previous, 3 parts new
-    steering_angle = (1 * float(steering_angle)/25 + 3 * float(model.predict(transformed_image_array, batch_size=1)))/3
+    steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
-    #throttle = 0.2
-    # Trying this out for kicks
-    throttle = 0.3 - 0.7 * abs(steering_angle)
-    print('out:', steering_angle, throttle)
+    throttle = 0.2
+    print(steering_angle, throttle)
     send_control(steering_angle, throttle)
 
 

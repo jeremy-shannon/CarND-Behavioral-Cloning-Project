@@ -4,6 +4,7 @@ from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
 from keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 import math
 import numpy as np
 from PIL import Image         
@@ -34,7 +35,7 @@ def displayCV2(img):
 
 def process_img_for_video(image, angle, frame):
     '''
-    Used by dataset_to_video method to format image prior to adding to video
+    Used by visualize_dataset method to format image prior to adding to video
     '''    
     font = cv2.FONT_HERSHEY_SIMPLEX
     # undo nomalization
@@ -49,15 +50,13 @@ def process_img_for_video(image, angle, frame):
     cv2.line(img,(int(w/2),int(h)),(int(w/2+angle*45),int(h/2)),(0,255,0),thickness=4)
     return img
     
-def dataset_to_video(X,y):
+def visualize_dataset(X,y):
     '''
     format the data from the dataset (image, steering angle) and place it into a video file 
     '''
-    # there are 6 versions of the same scene: 3 cameras, and flipped versions of each
-    for j in range(6):
-        for i in range(j,len(X),6):
-            img = process_img_for_video(X[i], y[i], i)
-            displayCV2(img)        
+    for i in range(len(X)):
+        img = process_img_for_video(X[i], y[i], i)
+        displayCV2(img)        
 
 def preprocess_image(img):
     '''
@@ -78,7 +77,7 @@ def preprocess_image(img):
     new_img = (new_img - 128.) / 128.
     return new_img
 
-def random_distort(img):
+def random_distort(img, angle):
     ''' 
     method for adding random distortion to dataset images, including random brightness adjust, and a random
     vertical shift of the horizon position
@@ -94,35 +93,56 @@ def random_distort(img):
     # randomly shift horizon
     h,w,_ = new_img.shape
     horizon = 2*h/5
-    v_shift = np.random.randint(-h/6,h/6)
+    v_shift = np.random.randint(-h/8,h/8)
     pts1 = np.float32([[0,horizon],[w,horizon],[0,h],[w,h]])
     pts2 = np.float32([[0,horizon+v_shift],[w,horizon+v_shift],[0,h],[w,h]])
     M = cv2.getPerspectiveTransform(pts1,pts2)
     new_img = cv2.warpPerspective(new_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
-    return new_img
+    # randomly flip horizontally and invert steer angle
+    if np.random.rand() > .5:
+        new_img = cv2.flip(new_img, 1)
+        angle *= -1
+    return (new_img, angle)
 
-def generate_training_data(image_paths, angles, validation):
+def generate_training_data(image_paths, angles, batch_size=128, validation_flag=False):
     '''
-    method for the model training data generator to loadm, process, and distort images
-    if 'validation' is true the image is not flipped or distorted
+    method for the model training data generator to load, process, and distort images
+    if 'validation_flag' is true the image is not distorted
     '''
-    while 1:
+    while True:       
         X = []
         y = []
-        for image_path,angle in zip(image_paths, angles):
-            img = cv2.imread(image_path)
+        image_paths, angles = shuffle(image_paths, angles)
+        for i in range(batch_size):
+            img = cv2.imread(image_paths[i])
+            angle = angles[i]
             img = preprocess_image(img)
-            if not validation:
-                img = random_distort(img)
-                # flip horizontally and add inverse steer angle
-                flipped_img = cv2.flip(img, 1)
-                X.append(flipped_img)
-                y.append(-1.0*float(angle))
+            if not validation_flag:
+                img, angle = random_distort(img, angle)
             X.append(img)
             y.append(angle)
-        Xn = np.array(X)
-        yn = np.array(y)
-        yield (X,y)
+        yield (np.array(X), np.array(y))
+
+def generate_training_data_for_visualization(image_paths, angles, batch_size=128):
+    '''
+    method for the model training data generator to load, process, and distort images
+    if 'validation_flag' is true the image is not distorted
+    '''
+    X = []
+    y = []
+    for i in range(batch_size):
+        img = cv2.imread(image_paths[i])
+        angle = angles[i]
+        img = preprocess_image(img)
+        if not validation_flag:
+            img, angle = random_distort(img, angle)
+        X.append(img)
+        y.append(angle)
+    return (np.array(X), np.array(y))
+
+'''
+Main program 
+'''
 
 import csv
 # Import driving data from csv
@@ -132,7 +152,7 @@ with open('./training_data/driving_log.csv', newline='') as f:
 image_paths = []
 angles = []
 
-# Gather data
+# Gather data - image paths and angles for center, left, right cameras in each row
 for row in driving_data:
     # skip it if ~0 speed - not representative of driving behavior
     if float(row[6]) < 0.1 :
@@ -142,15 +162,15 @@ for row in driving_data:
     angles.append(float(row[3]))
     # get left image path and angle
     image_paths.append(row[1])
-    angles.append(float(row[3])+0.2)
+    angles.append(float(row[3])+0.3)
     # get left image path and angle
     image_paths.append(row[2])
-    angles.append(float(row[3])-0.2)
+    angles.append(float(row[3])-0.3)
 
 image_paths = np.array(image_paths)
 angles = np.array(angles)
 
-print(image_paths.shape, angles.shape)
+print('Before:', image_paths.shape, angles.shape)
 
 # print a histogram to see which steering angle ranges are most overrepresented
 num_bins = 23
@@ -170,7 +190,6 @@ for i in range(num_bins):
         keep_probs.append(1.)
     else:
         keep_probs.append(1./(hist[i]/avg_samples_per_bin))
-# going to have to remove starting from end
 remove_list = []
 for i in range(len(angles)):
     for j in range(num_bins):
@@ -181,23 +200,23 @@ for i in range(len(angles)):
 image_paths = np.delete(image_paths, remove_list, axis=0)
 angles = np.delete(angles, remove_list)
 
-# print a histogram to see which steering angle ranges are most overrepresented
+# print histogram again to show more even distribution of steering angles
 hist, bins = np.histogram(angles, num_bins)
-width = 0.7 * (bins[1] - bins[0])
-center = (bins[:-1] + bins[1:]) / 2
 plt.bar(center, hist, align='center', width=width)
 plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
 plt.show()
 
-print(image_paths.shape, angles.shape)
+print('After:', image_paths.shape, angles.shape)
+
+# visualize a single batch of the data
+X,y = generate_training_data_for_visualization(image_paths, angles)
+visualize_dataset(X,y)
 
 image_paths_train, image_paths_test, angles_train, angles_test = train_test_split(image_paths, angles,
-                                                                                  test_size=0.2, random_state=42)
+                                                                                  test_size=0.05, random_state=42)
 
-# these lines can be used to sanity check the data if the infinite loop is removed from generate_training_data 
-# and 'yield' is changed to 'return'
-#X,y = generate_training_data(image_paths[0:10],angles[0:10],False)
-#dataset_to_video(X,y)
+print('Train:', image_paths_train.shape, angles_train.shape)
+print('Test:', image_paths_test.shape, angles_test.shape)
 
 ###### ConvNet Definintion ######
 
@@ -211,7 +230,9 @@ if not just_checkin_the_data:
     model.add(Convolution2D(24, 5, 5, subsample=(2, 2), border_mode='valid', input_shape=(66, 200, 3)))
     model.add(Convolution2D(36, 5, 5, subsample=(2, 2), border_mode='valid'))
     model.add(Convolution2D(48, 5, 5, subsample=(2, 2), border_mode='valid'))
-
+    
+    model.add(Dropout(0.50))
+    
     # Add two 3x3 convolution layers (output depth 64, and 64)
     model.add(Convolution2D(64, 3, 3, border_mode='valid'))
     model.add(Convolution2D(64, 3, 3, border_mode='valid'))
@@ -223,9 +244,9 @@ if not just_checkin_the_data:
     model.add(Dense(100, activation='tanh'))
     model.add(Dropout(0.50))
     model.add(Dense(50, activation='tanh'))
-    model.add(Dropout(0.50))
+    #model.add(Dropout(0.50))
     model.add(Dense(10, activation='tanh'))
-    model.add(Dropout(0.50))
+    #model.add(Dropout(0.50))
 
     # Add a fully connected output layer
     model.add(Dense(1))
@@ -233,16 +254,17 @@ if not just_checkin_the_data:
     # Compile and train the model, 
     model.compile('adam', 'mean_squared_error')
     #history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
-    history = model.fit_generator(generate_training_data(image_paths_train, angles_train, False), 
-                                  int(len(angles_train)*0.8), 5, verbose=2, 
-                                  validation_data=generate_training_data(image_paths_train, angles_train, True),
-                                  nb_val_samples=int(len(angles_train)*0.2))
-    model.evaluate_generator(generate_training_data(image_paths_test, angles_test, True), len(angles_test))
+    history = model.fit_generator(generate_training_data(image_paths_train, angles_train), 
+                                  samples_per_epoch=12800, nb_epoch=5, verbose=2, 
+                                  validation_data=generate_training_data(image_paths_train, angles_train, validation_flag=True),
+                                  nb_val_samples=1280)
+    print('Test Accuracy', model.evaluate_generator(generate_training_data(image_paths_test, angles_test, validation_flag=True),
+                                                    1280))
 
     print(model.summary())
 
     # Save model data
-    model.save_weights("./model.h5")
+    model.save_weights('./model.h5')
     json_string = model.to_json()
     with open('./model.json', 'w') as f:
         f.write(json_string)
