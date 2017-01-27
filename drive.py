@@ -30,16 +30,23 @@ prev_image_array = None
 
 def preprocess_image(img):
     '''
-    Method for preprocessing images:
+    Method for preprocessing images: this method is the same used in drive.py, except this version uses
+    BGR to YUV and drive.py uses RGB to YUV (due to using cv2 to read the image here, where drive.py images are 
+    received in RGB)
     '''
     # original shape: 160x320x3, input shape for neural net: 66x200x3
     # crop to 105x320x3
-    new_img = img[35:140,:,:]
+    #new_img = img[35:140,:,:]
+    # crop to 40x320x3
+    new_img = img[80:140,:,:]
     # apply subtle blur
-    new_img = cv2.GaussianBlur(new_img, (3,3), 0)
-    # scale to 66x200x3
+    #new_img = cv2.GaussianBlur(new_img, (9,9), 0)
+    # scale to 66x200x3 (same as nVidia)
     new_img = cv2.resize(new_img,(200, 66), interpolation = cv2.INTER_AREA)
+    # scale to ?x?x3
+    #new_img = cv2.resize(new_img,(80, 10), interpolation = cv2.INTER_AREA)
     # convert to YUV color space (as nVidia paper suggests)
+    ####### REMEMBER: IMAGES FROM SIMULATOR COME IN RGB!!!!!! #######
     new_img = cv2.cvtColor(new_img, cv2.COLOR_RGB2YUV)
     # normalize
     new_img = (new_img - 128.) / 128.
@@ -63,7 +70,7 @@ def telemetry(sid, data):
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
     throttle = 0.2
-    print(steering_angle, throttle)
+    #print(steering_angle, throttle)
     send_control(steering_angle, throttle)
 
 

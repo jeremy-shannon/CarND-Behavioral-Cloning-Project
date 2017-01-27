@@ -2,14 +2,17 @@ from keras.models import Sequential, model_from_json
 from keras.layers.core import Dense, Activation, Flatten, Dropout
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
+from keras.regularizers import l2, activity_l2
 from keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import math
+import threading
 import numpy as np
 from PIL import Image         
 import cv2                 
 import matplotlib.pyplot as plt
+from os import getcwd
                                                       
 # Fix error with TF and Keras
 import tensorflow as tf
@@ -33,7 +36,7 @@ def displayCV2(img):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-def process_img_for_video(image, angle, frame):
+def process_img_for_video(image, angle, pred_angle, frame):
     '''
     Used by visualize_dataset method to format image prior to adding to video
     '''    
@@ -41,21 +44,26 @@ def process_img_for_video(image, angle, frame):
     # undo nomalization
     img = (128*image+128).astype(np.uint8)
     img = cv2.cvtColor(img, cv2.COLOR_YUV2BGR)
-    img = cv2.resize(img,None,fx=2, fy=2, interpolation = cv2.INTER_CUBIC)
+    img = cv2.resize(img,None,fx=3, fy=3, interpolation = cv2.INTER_CUBIC)
     h,w = img.shape[0:2]
     # apply text for frame number and steering angle
     cv2.putText(img, 'frame: ' + str(frame), org=(2,18), fontFace=font, fontScale=.5, color=(255,255,255), thickness=1)
     cv2.putText(img, 'angle: ' + str(angle), org=(2,33), fontFace=font, fontScale=.5, color=(255,255,255), thickness=1)
     # apply a line representing the steering angle
     cv2.line(img,(int(w/2),int(h)),(int(w/2+angle*45),int(h/2)),(0,255,0),thickness=4)
+    if pred_angle is not None:
+        cv2.line(img,(int(w/2),int(h)),(int(w/2+pred_angle*45),int(h/2)),(0,0,255),thickness=4)
     return img
     
-def visualize_dataset(X,y):
+def visualize_dataset(X,y,y_pred=None):
     '''
     format the data from the dataset (image, steering angle) and place it into a video file 
     '''
     for i in range(len(X)):
-        img = process_img_for_video(X[i], y[i], i)
+        if y_pred is not None:
+            img = process_img_for_video(X[i], y[i], y_pred[i], i)
+        else: 
+            img = process_img_for_video(X[i], y[i], None, i)
         displayCV2(img)        
 
 def preprocess_image(img):
@@ -66,11 +74,15 @@ def preprocess_image(img):
     '''
     # original shape: 160x320x3, input shape for neural net: 66x200x3
     # crop to 105x320x3
-    new_img = img[35:140,:,:]
+    #new_img = img[35:140,:,:]
+    # crop to 40x320x3
+    new_img = img[80:140,:,:]
     # apply subtle blur
-    new_img = cv2.GaussianBlur(new_img, (3,3), 0)
+    #new_img = cv2.GaussianBlur(new_img, (5,5), 0)
     # scale to 66x200x3 (same as nVidia)
     new_img = cv2.resize(new_img,(200, 66), interpolation = cv2.INTER_AREA)
+    # scale to ?x?x3
+    #new_img = cv2.resize(new_img,(80, 10), interpolation = cv2.INTER_AREA)
     # convert to YUV color space (as nVidia paper suggests)
     new_img = cv2.cvtColor(new_img, cv2.COLOR_BGR2YUV)
     # normalize
@@ -82,7 +94,7 @@ def random_distort(img, angle):
     method for adding random distortion to dataset images, including random brightness adjust, and a random
     vertical shift of the horizon position
     '''
-    # random brightness
+    # random brightness - the mask bit keeps values from going beyond (-1,1)
     new_img = img.astype(np.float)
     value = np.random.uniform(-0.5, 0.5)
     if value > 0:
@@ -90,14 +102,24 @@ def random_distort(img, angle):
     if value < 0:
         mask = (new_img[:,:,0] + value) < -1.0
     new_img[:,:,0] += np.where(mask, 0.0, value)
+    # random shadow - full height, random left/right side, random darkening
+    h,w = new_img.shape[0:2]
+    mid = np.random.randint(0,w)
+    factor = np.random.uniform(-0.3,-0.1)
+    if np.random.rand() > .5:
+        new_img[:,0:mid,0] += (new_img[:,0:mid,0]+1) * factor
+    else:
+        new_img[:,mid:w,0] += (new_img[:,mid:w,0]+1) * factor
+
     # randomly shift horizon
-    h,w,_ = new_img.shape
-    horizon = 2*h/5
-    v_shift = np.random.randint(-h/8,h/8)
-    pts1 = np.float32([[0,horizon],[w,horizon],[0,h],[w,h]])
-    pts2 = np.float32([[0,horizon+v_shift],[w,horizon+v_shift],[0,h],[w,h]])
-    M = cv2.getPerspectiveTransform(pts1,pts2)
-    new_img = cv2.warpPerspective(new_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
+    # h,w,_ = new_img.shape
+    # horizon = 2*h/5
+    # v_shift = np.random.randint(-h/8,h/8)
+    # pts1 = np.float32([[0,horizon],[w,horizon],[0,h],[w,h]])
+    # pts2 = np.float32([[0,horizon+v_shift],[w,horizon+v_shift],[0,h],[w,h]])
+    # M = cv2.getPerspectiveTransform(pts1,pts2)
+    # new_img = cv2.warpPerspective(new_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
+
     # randomly flip horizontally and invert steer angle
     if np.random.rand() > .5:
         new_img = cv2.flip(new_img, 1)
@@ -109,11 +131,10 @@ def generate_training_data(image_paths, angles, batch_size=128, validation_flag=
     method for the model training data generator to load, process, and distort images
     if 'validation_flag' is true the image is not distorted
     '''
+    image_paths, angles = shuffle(image_paths, angles)
     while True:       
-        X = []
-        y = []
-        image_paths, angles = shuffle(image_paths, angles)
-        for i in range(batch_size):
+        X,y = ([],[])
+        for i in range(len(angles)):
             img = cv2.imread(image_paths[i])
             angle = angles[i]
             img = preprocess_image(img)
@@ -121,15 +142,18 @@ def generate_training_data(image_paths, angles, batch_size=128, validation_flag=
                 img, angle = random_distort(img, angle)
             X.append(img)
             y.append(angle)
-        yield (np.array(X), np.array(y))
+            if len(X) == batch_size:
+                yield (np.array(X), np.array(y))
+                X, y = ([],[])
 
-def generate_training_data_for_visualization(image_paths, angles, batch_size=128, validation_flag=False):
+def generate_training_data_for_visualization(image_paths, angles, batch_size=20, validation_flag=False):
     '''
     method for the model training data generator to load, process, and distort images
     if 'validation_flag' is true the image is not distorted
     '''
     X = []
     y = []
+    image_paths, angles = shuffle(image_paths, angles)
     for i in range(batch_size):
         img = cv2.imread(image_paths[i])
         angle = angles[i]
@@ -144,28 +168,35 @@ def generate_training_data_for_visualization(image_paths, angles, batch_size=128
 Main program 
 '''
 
+using_udacity_data = False
+img_path_prepend = ''
+csv_path = './training_data/driving_log.csv'
+if using_udacity_data:
+    img_path_prepend = getcwd() + '/udacity_data/'
+    csv_path = './udacity_data/driving_log.csv'
+
 import csv
 # Import driving data from csv
-with open('./training_data/driving_log.csv', newline='') as f:
+with open(csv_path, newline='') as f:
     driving_data = list(csv.reader(f, skipinitialspace=True, delimiter=',', quoting=csv.QUOTE_NONE))
 
 image_paths = []
 angles = []
 
 # Gather data - image paths and angles for center, left, right cameras in each row
-for row in driving_data:
+for row in driving_data[1:]:
     # skip it if ~0 speed - not representative of driving behavior
     if float(row[6]) < 0.1 :
         continue
     # get center image path and angle
-    image_paths.append(row[0])
+    image_paths.append(img_path_prepend + row[0])
     angles.append(float(row[3]))
     # get left image path and angle
-    image_paths.append(row[1])
-    angles.append(float(row[3])+0.3)
+    image_paths.append(img_path_prepend + row[1])
+    angles.append(float(row[3])+0.35)
     # get left image path and angle
-    image_paths.append(row[2])
-    angles.append(float(row[3])-0.3)
+    image_paths.append(img_path_prepend + row[2])
+    angles.append(float(row[3])-0.35)
 
 image_paths = np.array(image_paths)
 angles = np.array(angles)
@@ -180,7 +211,7 @@ width = 0.7 * (bins[1] - bins[0])
 center = (bins[:-1] + bins[1:]) / 2
 plt.bar(center, hist, align='center', width=width)
 plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
-plt.show()
+#plt.show()
 
 # determine keep probability for each bin: if below avg_samples_per_bin, keep all; otherwise keep prob is proportional
 # to number of samples above the average, so as to bring the number of samples for that bin down to the average
@@ -204,7 +235,7 @@ angles = np.delete(angles, remove_list)
 hist, bins = np.histogram(angles, num_bins)
 plt.bar(center, hist, align='center', width=width)
 plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
-plt.show()
+#plt.show()
 
 print('After:', image_paths.shape, angles.shape)
 
@@ -212,9 +243,9 @@ print('After:', image_paths.shape, angles.shape)
 X,y = generate_training_data_for_visualization(image_paths, angles)
 visualize_dataset(X,y)
 
+# split into train/test sets
 image_paths_train, image_paths_test, angles_train, angles_test = train_test_split(image_paths, angles,
                                                                                   test_size=0.05, random_state=42)
-
 print('Train:', image_paths_train.shape, angles_train.shape)
 print('Test:', image_paths_test.shape, angles_test.shape)
 
@@ -241,11 +272,11 @@ if not just_checkin_the_data:
     model.add(Flatten())
 
     # Add three fully connected layers (depth 100, 50, 10), tanh activation (and dropouts)
-    model.add(Dense(100, activation='tanh'))
+    model.add(Dense(100, activation='tanh', W_regularizer=l2(0.01)))
     model.add(Dropout(0.50))
-    model.add(Dense(50, activation='tanh'))
+    model.add(Dense(50, activation='tanh', W_regularizer=l2(0.01)))
     #model.add(Dropout(0.50))
-    model.add(Dense(10, activation='tanh'))
+    model.add(Dense(10, activation='tanh', W_regularizer=l2(0.01)))
     #model.add(Dropout(0.50))
 
     # Add a fully connected output layer
@@ -253,15 +284,34 @@ if not just_checkin_the_data:
 
     # Compile and train the model, 
     model.compile('adam', 'mean_squared_error')
+
+    ############ REMOVE - just for tweaking model ##############
+    # pulling out 128 random samples and training just on them, to make sure the model is capable of overfitting
+    # indices_train = np.random.randint(0, len(image_paths_train), 128)
+    # indices_test = np.random.randint(0, len(image_paths_test), 12)
+    # image_paths_train = image_paths_train[indices_train]
+    # angles_train = angles_train[indices_train]
+    # image_paths_test = image_paths_test[indices_test]
+    # angles_test = angles_test[indices_test]
+    #############################################################
+
+    # initialize generators
+    train_gen = generate_training_data(image_paths_train, angles_train, validation_flag=False, batch_size=128)
+    val_gen = generate_training_data(image_paths_train, angles_train, validation_flag=True, batch_size=128)
+    test_gen = generate_training_data(image_paths_test, angles_test, validation_flag=True, batch_size=128)
+
     #history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
-    history = model.fit_generator(generate_training_data(image_paths_train, angles_train), 
-                                  samples_per_epoch=12800, nb_epoch=5, verbose=2, 
-                                  validation_data=generate_training_data(image_paths_train, angles_train, validation_flag=True),
-                                  nb_val_samples=1280)
-    print('Test Loss:', model.evaluate_generator(generate_training_data(image_paths_test, angles_test, validation_flag=True),
-                                                    1280))
+    history = model.fit_generator(train_gen, validation_data=val_gen, nb_val_samples=1280, samples_per_epoch=12800, 
+                                  nb_epoch=5, verbose=2)
+    # print('Test Loss:', model.evaluate_generator(test_gen, 128))
 
     print(model.summary())
+
+    # visualize some predictions
+    n = 12
+    X_test,y_test = generate_training_data_for_visualization(image_paths_test[:n], angles_test[:n], batch_size=n,                                                                     validation_flag=True)
+    y_pred = model.predict(X_test, n, verbose=2)
+    visualize_dataset(X_test, y_test, y_pred)
 
     # Save model data
     model.save_weights('./model.h5')
