@@ -48,8 +48,6 @@ def preprocess_image(img):
     # convert to YUV color space (as nVidia paper suggests)
     ####### REMEMBER: IMAGES FROM SIMULATOR COME IN RGB!!!!!! #######
     new_img = cv2.cvtColor(new_img, cv2.COLOR_RGB2YUV)
-    # normalize
-    new_img = (new_img - 128.) / 128.
     return new_img
 
 @sio.on('telemetry')
@@ -70,6 +68,8 @@ def telemetry(sid, data):
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
     throttle = 0.2
+    if float(speed) < 0:
+        throttle = 1
     #print(steering_angle, throttle)
     send_control(steering_angle, throttle)
 

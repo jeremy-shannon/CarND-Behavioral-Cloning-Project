@@ -1,5 +1,5 @@
 from keras.models import Sequential, model_from_json
-from keras.layers.core import Dense, Activation, Flatten, Dropout
+from keras.layers.core import Dense, Activation, Flatten, Dropout, Lambda
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
 from keras.regularizers import l2, activity_l2
@@ -7,7 +7,6 @@ from keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import math
-import threading
 import numpy as np
 from PIL import Image         
 import cv2                 
@@ -41,18 +40,16 @@ def process_img_for_video(image, angle, pred_angle, frame):
     Used by visualize_dataset method to format image prior to adding to video
     '''    
     font = cv2.FONT_HERSHEY_SIMPLEX
-    # undo nomalization
-    img = (128*image+128).astype(np.uint8)
-    img = cv2.cvtColor(img, cv2.COLOR_YUV2BGR)
+    img = cv2.cvtColor(image, cv2.COLOR_YUV2BGR)
     img = cv2.resize(img,None,fx=3, fy=3, interpolation = cv2.INTER_CUBIC)
     h,w = img.shape[0:2]
     # apply text for frame number and steering angle
     cv2.putText(img, 'frame: ' + str(frame), org=(2,18), fontFace=font, fontScale=.5, color=(255,255,255), thickness=1)
     cv2.putText(img, 'angle: ' + str(angle), org=(2,33), fontFace=font, fontScale=.5, color=(255,255,255), thickness=1)
     # apply a line representing the steering angle
-    cv2.line(img,(int(w/2),int(h)),(int(w/2+angle*45),int(h/2)),(0,255,0),thickness=4)
+    cv2.line(img,(int(w/2),int(h)),(int(w/2+angle*w/4),int(h/2)),(0,255,0),thickness=4)
     if pred_angle is not None:
-        cv2.line(img,(int(w/2),int(h)),(int(w/2+pred_angle*45),int(h/2)),(0,0,255),thickness=4)
+        cv2.line(img,(int(w/2),int(h)),(int(w/2+pred_angle*w/4),int(h/2)),(0,0,255),thickness=4)
     return img
     
 def visualize_dataset(X,y,y_pred=None):
@@ -85,8 +82,6 @@ def preprocess_image(img):
     #new_img = cv2.resize(new_img,(80, 10), interpolation = cv2.INTER_AREA)
     # convert to YUV color space (as nVidia paper suggests)
     new_img = cv2.cvtColor(new_img, cv2.COLOR_BGR2YUV)
-    # normalize
-    new_img = (new_img - 128.) / 128.
     return new_img
 
 def random_distort(img, angle):
@@ -94,22 +89,22 @@ def random_distort(img, angle):
     method for adding random distortion to dataset images, including random brightness adjust, and a random
     vertical shift of the horizon position
     '''
-    # random brightness - the mask bit keeps values from going beyond (-1,1)
-    new_img = img.astype(np.float)
-    value = np.random.uniform(-0.5, 0.5)
+    new_img = img.astype(float)
+    # random brightness - the mask bit keeps values from going beyond (0,255)
+    value = np.random.randint(-28, 28)
     if value > 0:
-        mask = (new_img[:,:,0] + value) > 1.0 
-    if value < 0:
-        mask = (new_img[:,:,0] + value) < -1.0
-    new_img[:,:,0] += np.where(mask, 0.0, value)
+        mask = (new_img[:,:,0] + value) > 255 
+    if value <= 0:
+        mask = (new_img[:,:,0] + value) < 0
+    new_img[:,:,0] += np.where(mask, 0, value)
     # random shadow - full height, random left/right side, random darkening
     h,w = new_img.shape[0:2]
     mid = np.random.randint(0,w)
-    factor = np.random.uniform(-0.3,-0.1)
+    factor = np.random.uniform(0.6,0.8)
     if np.random.rand() > .5:
-        new_img[:,0:mid,0] += (new_img[:,0:mid,0]+1) * factor
+        new_img[:,0:mid,0] *= factor
     else:
-        new_img[:,mid:w,0] += (new_img[:,mid:w,0]+1) * factor
+        new_img[:,mid:w,0] *= factor
 
     # randomly shift horizon
     # h,w,_ = new_img.shape
@@ -124,7 +119,7 @@ def random_distort(img, angle):
     if np.random.rand() > .5:
         new_img = cv2.flip(new_img, 1)
         angle *= -1
-    return (new_img, angle)
+    return (new_img.astype(np.uint8), angle)
 
 def generate_training_data(image_paths, angles, batch_size=128, validation_flag=False):
     '''
@@ -241,7 +236,7 @@ print('After:', image_paths.shape, angles.shape)
 
 # visualize a single batch of the data
 X,y = generate_training_data_for_visualization(image_paths, angles)
-visualize_dataset(X,y)
+#visualize_dataset(X,y)
 
 # split into train/test sets
 image_paths_train, image_paths_test, angles_train, angles_test = train_test_split(image_paths, angles,
@@ -257,8 +252,11 @@ just_checkin_the_data = False
 if not just_checkin_the_data:
     model = Sequential()
 
+    # Normalize
+    model.add(Lambda(lambda x: x/127.5 - 1.0,input_shape=(66,200,3)))
+
     # Add three 5x5 convolution layers (output depth 24, 36, and 48), each with 2x2 stride
-    model.add(Convolution2D(24, 5, 5, subsample=(2, 2), border_mode='valid', input_shape=(66, 200, 3)))
+    model.add(Convolution2D(24, 5, 5, subsample=(2, 2), border_mode='valid'))
     model.add(Convolution2D(36, 5, 5, subsample=(2, 2), border_mode='valid'))
     model.add(Convolution2D(48, 5, 5, subsample=(2, 2), border_mode='valid'))
     
