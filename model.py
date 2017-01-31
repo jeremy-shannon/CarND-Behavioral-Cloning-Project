@@ -221,11 +221,12 @@ plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per
 # determine keep probability for each bin: if below avg_samples_per_bin, keep all; otherwise keep prob is proportional
 # to number of samples above the average, so as to bring the number of samples for that bin down to the average
 keep_probs = []
+target = avg_samples_per_bin * 2
 for i in range(num_bins):
     if hist[i] < avg_samples_per_bin:
         keep_probs.append(1.)
     else:
-        keep_probs.append(1./(hist[i]/avg_samples_per_bin))
+        keep_probs.append(1./(hist[i]/target))
 remove_list = []
 for i in range(len(angles)):
     for j in range(num_bins):
