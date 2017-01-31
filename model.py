@@ -2,8 +2,10 @@ from keras.models import Sequential, model_from_json
 from keras.layers.core import Dense, Activation, Flatten, Dropout, Lambda
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
+from keras.layers.advanced_activations import ELU
 from keras.regularizers import l2, activity_l2
 from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint, Callback
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import math
@@ -12,7 +14,7 @@ from PIL import Image
 import cv2                 
 import matplotlib.pyplot as plt
 from os import getcwd
-                                                      
+import csv
 # Fix error with TF and Keras
 import tensorflow as tf
 tf.python.control_flow_ops = tf
@@ -73,7 +75,7 @@ def preprocess_image(img):
     # crop to 105x320x3
     #new_img = img[35:140,:,:]
     # crop to 40x320x3
-    new_img = img[80:140,:,:]
+    new_img = img[70:140,:,:]
     # apply subtle blur
     #new_img = cv2.GaussianBlur(new_img, (5,5), 0)
     # scale to 66x200x3 (same as nVidia)
@@ -105,7 +107,6 @@ def random_distort(img, angle):
         new_img[:,0:mid,0] *= factor
     else:
         new_img[:,mid:w,0] *= factor
-
     # randomly shift horizon
     # h,w,_ = new_img.shape
     # horizon = 2*h/5
@@ -114,11 +115,6 @@ def random_distort(img, angle):
     # pts2 = np.float32([[0,horizon+v_shift],[w,horizon+v_shift],[0,h],[w,h]])
     # M = cv2.getPerspectiveTransform(pts1,pts2)
     # new_img = cv2.warpPerspective(new_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
-
-    # randomly flip horizontally and invert steer angle
-    if np.random.rand() > .5:
-        new_img = cv2.flip(new_img, 1)
-        angle *= -1
     return (new_img.astype(np.uint8), angle)
 
 def generate_training_data(image_paths, angles, batch_size=128, validation_flag=False):
@@ -127,14 +123,22 @@ def generate_training_data(image_paths, angles, batch_size=128, validation_flag=
     if 'validation_flag' is true the image is not distorted
     '''
     image_paths, angles = shuffle(image_paths, angles)
+    X,y = ([],[])
     while True:       
-        X,y = ([],[])
         for i in range(len(angles)):
             img = cv2.imread(image_paths[i])
             angle = angles[i]
             img = preprocess_image(img)
             if not validation_flag:
                 img, angle = random_distort(img, angle)
+            X.append(img)
+            y.append(angle)
+            if len(X) == batch_size:
+                yield (np.array(X), np.array(y))
+                X, y = ([],[])
+            # flip horizontally and invert steer angle
+            img = cv2.flip(img, 1)
+            angle *= -1
             X.append(img)
             y.append(angle)
             if len(X) == batch_size:
@@ -163,35 +167,41 @@ def generate_training_data_for_visualization(image_paths, angles, batch_size=20,
 Main program 
 '''
 
-using_udacity_data = False
-img_path_prepend = ''
-csv_path = './training_data/driving_log.csv'
-if using_udacity_data:
-    img_path_prepend = getcwd() + '/udacity_data/'
-    csv_path = './udacity_data/driving_log.csv'
+# select data source(s) here
+using_my_data = True
+using_udacity_data = True
 
-import csv
-# Import driving data from csv
-with open(csv_path, newline='') as f:
-    driving_data = list(csv.reader(f, skipinitialspace=True, delimiter=',', quoting=csv.QUOTE_NONE))
+data_to_use = [using_my_data, using_udacity_data]
+img_path_prepend = ['', getcwd() + '/udacity_data/']
+csv_path = ['./training_data/driving_log.csv', './udacity_data/driving_log.csv']
 
 image_paths = []
 angles = []
 
-# Gather data - image paths and angles for center, left, right cameras in each row
-for row in driving_data[1:]:
-    # skip it if ~0 speed - not representative of driving behavior
-    if float(row[6]) < 0.1 :
+for j in range(2):
+    if not data_to_use[j]:
+        # 0 = my own data, 1 = Udacity supplied data
+        print('not using dataset ', j)
         continue
-    # get center image path and angle
-    image_paths.append(img_path_prepend + row[0])
-    angles.append(float(row[3]))
-    # get left image path and angle
-    image_paths.append(img_path_prepend + row[1])
-    angles.append(float(row[3])+0.35)
-    # get left image path and angle
-    image_paths.append(img_path_prepend + row[2])
-    angles.append(float(row[3])-0.35)
+    # Import driving data from csv
+    with open(csv_path[j], newline='') as f:
+        driving_data = list(csv.reader(f, skipinitialspace=True, delimiter=',', quoting=csv.QUOTE_NONE))
+
+
+    # Gather data - image paths and angles for center, left, right cameras in each row
+    for row in driving_data[1:]:
+        # skip it if ~0 speed - not representative of driving behavior
+        if float(row[6]) < 0.1 :
+            continue
+        # get center image path and angle
+        image_paths.append(img_path_prepend[j] + row[0])
+        angles.append(float(row[3]))
+        # get left image path and angle
+        #image_paths.append(img_path_prepend[j] + row[1])
+        #angles.append(float(row[3])+0.25)
+        # get left image path and angle
+        #image_paths.append(img_path_prepend[j] + row[2])
+        #angles.append(float(row[3])-0.25)
 
 image_paths = np.array(image_paths)
 angles = np.array(angles)
@@ -257,24 +267,32 @@ if not just_checkin_the_data:
 
     # Add three 5x5 convolution layers (output depth 24, 36, and 48), each with 2x2 stride
     model.add(Convolution2D(24, 5, 5, subsample=(2, 2), border_mode='valid'))
+    model.add(ELU())
     model.add(Convolution2D(36, 5, 5, subsample=(2, 2), border_mode='valid'))
+    model.add(ELU())
     model.add(Convolution2D(48, 5, 5, subsample=(2, 2), border_mode='valid'))
-    
+    model.add(ELU())
+
     model.add(Dropout(0.50))
     
     # Add two 3x3 convolution layers (output depth 64, and 64)
     model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+    model.add(ELU())
     model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+    model.add(ELU())
 
     # Add a flatten layer
     model.add(Flatten())
 
     # Add three fully connected layers (depth 100, 50, 10), tanh activation (and dropouts)
-    model.add(Dense(100, activation='tanh', W_regularizer=l2(0.01)))
+    model.add(Dense(100, W_regularizer=l2(0.01)))
+    model.add(ELU())
     model.add(Dropout(0.50))
-    model.add(Dense(50, activation='tanh', W_regularizer=l2(0.01)))
+    model.add(Dense(50, W_regularizer=l2(0.01)))
+    model.add(ELU())
     #model.add(Dropout(0.50))
-    model.add(Dense(10, activation='tanh', W_regularizer=l2(0.01)))
+    model.add(Dense(10, W_regularizer=l2(0.01)))
+    model.add(ELU())
     #model.add(Dropout(0.50))
 
     # Add a fully connected output layer
@@ -298,9 +316,11 @@ if not just_checkin_the_data:
     val_gen = generate_training_data(image_paths_train, angles_train, validation_flag=True, batch_size=128)
     test_gen = generate_training_data(image_paths_test, angles_test, validation_flag=True, batch_size=128)
 
+    checkpoint = ModelCheckpoint('model{epoch:02d}.h5')
+
     #history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
-    history = model.fit_generator(train_gen, validation_data=val_gen, nb_val_samples=1280, samples_per_epoch=12800, 
-                                  nb_epoch=5, verbose=2)
+    history = model.fit_generator(train_gen, validation_data=val_gen, nb_val_samples=2560, samples_per_epoch=25600, 
+                                  nb_epoch=5, verbose=2, callbacks=[checkpoint])
     # print('Test Loss:', model.evaluate_generator(test_gen, 128))
 
     print(model.summary())

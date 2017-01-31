@@ -164,7 +164,7 @@ if __name__ == '__main__':
         # sort the diffs between predicted and actual, then take the bottom m indices
         m = 5
         bottom_m = np.argsort(abs(y_pred-y_test))[batch_size-m:]
-        print('indices:', bottom_m+(i*batch_size) + 1)
+        print('indices:', bottom_m+(i*n) + 1)
         print('actuals:', y_test[bottom_m])
         print('predictions:', y_pred[bottom_m])
         print('')
