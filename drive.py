@@ -38,9 +38,9 @@ def preprocess_image(img):
     # crop to 105x320x3
     #new_img = img[35:140,:,:]
     # crop to 40x320x3
-    new_img = img[70:140,:,:]
+    new_img = img[50:140,:,:]
     # apply subtle blur
-    #new_img = cv2.GaussianBlur(new_img, (9,9), 0)
+    new_img = cv2.GaussianBlur(new_img, (3,3), 0)
     # scale to 66x200x3 (same as nVidia)
     new_img = cv2.resize(new_img,(200, 66), interpolation = cv2.INTER_AREA)
     # scale to ?x?x3
@@ -68,9 +68,8 @@ def telemetry(sid, data):
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
     throttle = 0.2
-    if float(speed) < 0:
+    if float(speed) < 10:
         throttle = 1
-    #print(steering_angle, throttle)
     send_control(steering_angle, throttle)
 
 

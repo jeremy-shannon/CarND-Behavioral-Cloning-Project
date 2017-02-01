@@ -75,9 +75,9 @@ def preprocess_image(img):
     # crop to 105x320x3
     #new_img = img[35:140,:,:]
     # crop to 40x320x3
-    new_img = img[70:140,:,:]
+    new_img = img[50:140,:,:]
     # apply subtle blur
-    #new_img = cv2.GaussianBlur(new_img, (5,5), 0)
+    new_img = cv2.GaussianBlur(new_img, (3,3), 0)
     # scale to 66x200x3 (same as nVidia)
     new_img = cv2.resize(new_img,(200, 66), interpolation = cv2.INTER_AREA)
     # scale to ?x?x3
@@ -108,13 +108,13 @@ def random_distort(img, angle):
     else:
         new_img[:,mid:w,0] *= factor
     # randomly shift horizon
-    # h,w,_ = new_img.shape
-    # horizon = 2*h/5
-    # v_shift = np.random.randint(-h/8,h/8)
-    # pts1 = np.float32([[0,horizon],[w,horizon],[0,h],[w,h]])
-    # pts2 = np.float32([[0,horizon+v_shift],[w,horizon+v_shift],[0,h],[w,h]])
-    # M = cv2.getPerspectiveTransform(pts1,pts2)
-    # new_img = cv2.warpPerspective(new_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
+    h,w,_ = new_img.shape
+    horizon = 2*h/5
+    v_shift = np.random.randint(-h/8,h/8)
+    pts1 = np.float32([[0,horizon],[w,horizon],[0,h],[w,h]])
+    pts2 = np.float32([[0,horizon+v_shift],[w,horizon+v_shift],[0,h],[w,h]])
+    M = cv2.getPerspectiveTransform(pts1,pts2)
+    new_img = cv2.warpPerspective(new_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
     return (new_img.astype(np.uint8), angle)
 
 def generate_training_data(image_paths, angles, batch_size=128, validation_flag=False):
@@ -197,11 +197,11 @@ for j in range(2):
         image_paths.append(img_path_prepend[j] + row[0])
         angles.append(float(row[3]))
         # get left image path and angle
-        #image_paths.append(img_path_prepend[j] + row[1])
-        #angles.append(float(row[3])+0.25)
+        image_paths.append(img_path_prepend[j] + row[1])
+        angles.append(float(row[3])+0.25)
         # get left image path and angle
-        #image_paths.append(img_path_prepend[j] + row[2])
-        #angles.append(float(row[3])-0.25)
+        image_paths.append(img_path_prepend[j] + row[2])
+        angles.append(float(row[3])-0.25)
 
 image_paths = np.array(image_paths)
 angles = np.array(angles)
@@ -216,7 +216,7 @@ width = 0.7 * (bins[1] - bins[0])
 center = (bins[:-1] + bins[1:]) / 2
 plt.bar(center, hist, align='center', width=width)
 plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
-#plt.show()
+plt.show()
 
 # determine keep probability for each bin: if below avg_samples_per_bin, keep all; otherwise keep prob is proportional
 # to number of samples above the average, so as to bring the number of samples for that bin down to the average
@@ -241,7 +241,7 @@ angles = np.delete(angles, remove_list)
 hist, bins = np.histogram(angles, num_bins)
 plt.bar(center, hist, align='center', width=width)
 plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
-#plt.show()
+plt.show()
 
 print('After:', image_paths.shape, angles.shape)
 
@@ -258,7 +258,7 @@ print('Test:', image_paths_test.shape, angles_test.shape)
 ###### ConvNet Definintion ######
 
 # for debugging purposes - don't want to mess with the model if just checkin' the data
-just_checkin_the_data = False
+just_checkin_the_data = True
 
 if not just_checkin_the_data:
     model = Sequential()
@@ -267,32 +267,32 @@ if not just_checkin_the_data:
     model.add(Lambda(lambda x: x/127.5 - 1.0,input_shape=(66,200,3)))
 
     # Add three 5x5 convolution layers (output depth 24, 36, and 48), each with 2x2 stride
-    model.add(Convolution2D(24, 5, 5, subsample=(2, 2), border_mode='valid'))
+    model.add(Convolution2D(24, 5, 5, subsample=(2, 2), border_mode='valid', W_regularizer=l2(0.001)))
     model.add(ELU())
-    model.add(Convolution2D(36, 5, 5, subsample=(2, 2), border_mode='valid'))
+    model.add(Convolution2D(36, 5, 5, subsample=(2, 2), border_mode='valid', W_regularizer=l2(0.001)))
     model.add(ELU())
-    model.add(Convolution2D(48, 5, 5, subsample=(2, 2), border_mode='valid'))
+    model.add(Convolution2D(48, 5, 5, subsample=(2, 2), border_mode='valid', W_regularizer=l2(0.001)))
     model.add(ELU())
 
-    model.add(Dropout(0.50))
+    #model.add(Dropout(0.50))
     
     # Add two 3x3 convolution layers (output depth 64, and 64)
-    model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+    model.add(Convolution2D(64, 3, 3, border_mode='valid', W_regularizer=l2(0.001)))
     model.add(ELU())
-    model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+    model.add(Convolution2D(64, 3, 3, border_mode='valid', W_regularizer=l2(0.001)))
     model.add(ELU())
 
     # Add a flatten layer
     model.add(Flatten())
 
     # Add three fully connected layers (depth 100, 50, 10), tanh activation (and dropouts)
-    model.add(Dense(100, W_regularizer=l2(0.01)))
-    model.add(ELU())
-    model.add(Dropout(0.50))
-    model.add(Dense(50, W_regularizer=l2(0.01)))
+    model.add(Dense(100, W_regularizer=l2(0.001)))
     model.add(ELU())
     #model.add(Dropout(0.50))
-    model.add(Dense(10, W_regularizer=l2(0.01)))
+    model.add(Dense(50, W_regularizer=l2(0.001)))
+    model.add(ELU())
+    #model.add(Dropout(0.50))
+    model.add(Dense(10, W_regularizer=l2(0.001)))
     model.add(ELU())
     #model.add(Dropout(0.50))
 
@@ -300,7 +300,8 @@ if not just_checkin_the_data:
     model.add(Dense(1))
 
     # Compile and train the model, 
-    model.compile('adam', 'mean_squared_error')
+    #model.compile('adam', 'mean_squared_error')
+    model.compile(optimizer=Adam(lr=1e-4), loss='mse')
 
     ############ REMOVE - just for tweaking model ##############
     # pulling out 128 random samples and training just on them, to make sure the model is capable of overfitting
@@ -313,14 +314,14 @@ if not just_checkin_the_data:
     #############################################################
 
     # initialize generators
-    train_gen = generate_training_data(image_paths_train, angles_train, validation_flag=False, batch_size=128)
-    val_gen = generate_training_data(image_paths_train, angles_train, validation_flag=True, batch_size=128)
-    test_gen = generate_training_data(image_paths_test, angles_test, validation_flag=True, batch_size=128)
+    train_gen = generate_training_data(image_paths_train, angles_train, validation_flag=False, batch_size=64)
+    val_gen = generate_training_data(image_paths_train, angles_train, validation_flag=True, batch_size=64)
+    test_gen = generate_training_data(image_paths_test, angles_test, validation_flag=True, batch_size=64)
 
     checkpoint = ModelCheckpoint('model{epoch:02d}.h5')
 
     #history = model.fit(X, y, batch_size=128, nb_epoch=5, validation_split=0.2, verbose=2)
-    history = model.fit_generator(train_gen, validation_data=val_gen, nb_val_samples=2560, samples_per_epoch=25600, 
+    history = model.fit_generator(train_gen, validation_data=val_gen, nb_val_samples=2560, samples_per_epoch=23040, 
                                   nb_epoch=5, verbose=2, callbacks=[checkpoint])
     # print('Test Loss:', model.evaluate_generator(test_gen, 128))
 
