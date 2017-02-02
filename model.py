@@ -120,7 +120,8 @@ def random_distort(img, angle):
 def generate_training_data(image_paths, angles, batch_size=128, validation_flag=False):
     '''
     method for the model training data generator to load, process, and distort images
-    if 'validation_flag' is true the image is not distorted
+    if 'validation_flag' is true the image is not distorted, also enforces choosing a uniform distribution of
+    left, right, and center steering angles (left: < -0.33, right: > 0.33, center: between -0.33 and 0.33)
     '''
     image_paths, angles = shuffle(image_paths, angles)
     X,y = ([],[])
@@ -136,14 +137,18 @@ def generate_training_data(image_paths, angles, batch_size=128, validation_flag=
             if len(X) == batch_size:
                 yield (np.array(X), np.array(y))
                 X, y = ([],[])
-            # flip horizontally and invert steer angle
-            img = cv2.flip(img, 1)
-            angle *= -1
-            X.append(img)
-            y.append(angle)
-            if len(X) == batch_size:
-                yield (np.array(X), np.array(y))
-                X, y = ([],[])
+                image_paths, angles = shuffle(image_paths, angles)
+            # flip horizontally and invert steer angle, if magnitude is > 0.33
+            if abs(angle) > 0.33:
+                img = cv2.flip(img, 1)
+                angle *= -1
+                X.append(img)
+                y.append(angle)
+                if len(X) == batch_size:
+                    yield (np.array(X), np.array(y))
+                    X, y = ([],[])
+                    image_paths, angles = shuffle(image_paths, angles)
+
 
 def generate_training_data_for_visualization(image_paths, angles, batch_size=20, validation_flag=False):
     '''
@@ -216,14 +221,14 @@ width = 0.7 * (bins[1] - bins[0])
 center = (bins[:-1] + bins[1:]) / 2
 plt.bar(center, hist, align='center', width=width)
 plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
-plt.show()
+#plt.show()
 
 # determine keep probability for each bin: if below avg_samples_per_bin, keep all; otherwise keep prob is proportional
 # to number of samples above the average, so as to bring the number of samples for that bin down to the average
 keep_probs = []
-target = avg_samples_per_bin * 2
+target = avg_samples_per_bin * .5
 for i in range(num_bins):
-    if hist[i] < avg_samples_per_bin:
+    if hist[i] < target:
         keep_probs.append(1.)
     else:
         keep_probs.append(1./(hist[i]/target))
@@ -241,7 +246,7 @@ angles = np.delete(angles, remove_list)
 hist, bins = np.histogram(angles, num_bins)
 plt.bar(center, hist, align='center', width=width)
 plt.plot((np.min(angles), np.max(angles)), (avg_samples_per_bin, avg_samples_per_bin), 'k-')
-plt.show()
+#plt.show()
 
 print('After:', image_paths.shape, angles.shape)
 
@@ -258,7 +263,7 @@ print('Test:', image_paths_test.shape, angles_test.shape)
 ###### ConvNet Definintion ######
 
 # for debugging purposes - don't want to mess with the model if just checkin' the data
-just_checkin_the_data = True
+just_checkin_the_data = False
 
 if not just_checkin_the_data:
     model = Sequential()
@@ -303,7 +308,7 @@ if not just_checkin_the_data:
     #model.compile('adam', 'mean_squared_error')
     model.compile(optimizer=Adam(lr=1e-4), loss='mse')
 
-    ############ REMOVE - just for tweaking model ##############
+    ############  just for tweaking model ##############
     # pulling out 128 random samples and training just on them, to make sure the model is capable of overfitting
     # indices_train = np.random.randint(0, len(image_paths_train), 128)
     # indices_test = np.random.randint(0, len(image_paths_test), 12)
