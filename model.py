@@ -46,8 +46,8 @@ def process_img_for_video(image, angle, pred_angle, frame):
     img = cv2.resize(img,None,fx=3, fy=3, interpolation = cv2.INTER_CUBIC)
     h,w = img.shape[0:2]
     # apply text for frame number and steering angle
-    cv2.putText(img, 'frame: ' + str(frame), org=(2,18), fontFace=font, fontScale=.5, color=(255,255,255), thickness=1)
-    cv2.putText(img, 'angle: ' + str(angle), org=(2,33), fontFace=font, fontScale=.5, color=(255,255,255), thickness=1)
+    cv2.putText(img, 'frame: ' + str(frame), org=(2,18), fontFace=font, fontScale=.5, color=(200,100,100), thickness=1)
+    cv2.putText(img, 'angle: ' + str(angle), org=(2,33), fontFace=font, fontScale=.5, color=(200,100,100), thickness=1)
     # apply a line representing the steering angle
     cv2.line(img,(int(w/2),int(h)),(int(w/2+angle*w/4),int(h/2)),(0,255,0),thickness=4)
     if pred_angle is not None:
@@ -252,7 +252,7 @@ print('After:', image_paths.shape, angles.shape)
 
 # visualize a single batch of the data
 X,y = generate_training_data_for_visualization(image_paths, angles)
-#visualize_dataset(X,y)
+visualize_dataset(X,y)
 
 # split into train/test sets
 image_paths_train, image_paths_test, angles_train, angles_test = train_test_split(image_paths, angles,
@@ -263,7 +263,7 @@ print('Test:', image_paths_test.shape, angles_test.shape)
 ###### ConvNet Definintion ######
 
 # for debugging purposes - don't want to mess with the model if just checkin' the data
-just_checkin_the_data = False
+just_checkin_the_data = True
 
 if not just_checkin_the_data:
     model = Sequential()

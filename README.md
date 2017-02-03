@@ -1,6 +1,6 @@
 # Udacity Self-Driving Car Engineer Nanodegree - Behavioral Cloning Project
 
-*My solution to the Udacity Self-Driving Car Engineer Nanodegree behavioral cloning project.*
+*My solution to the Udacity Self-Driving Car Engineer Nanodegree Behavioral Cloning project.*
 
 **Note: This project makes use of a Udacity-developed driving simulator and training data collected from the simulator (neither of which is included in this repo).**
 
@@ -16,7 +16,29 @@ The challenge of this project is not only developing a CNN model that is able to
 
 ## Approach
 
-The project instructions from Udacity suggest starting from a known self-driving car model and provided a link to the [nVidia model](https://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf) (and later in the student forum, the [comma.ai model](https://github.com/commaai/research/blob/master/train_steering_model.py))
+### 1. Base Model and Adjustments
+
+The project instructions from Udacity suggest starting from a known self-driving car model and provided a link to the [nVidia model](https://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf) (and later in the student forum, the [comma.ai model](https://github.com/commaai/research/blob/master/train_steering_model.py)) - the diagram below is a depiction of the nVidia model.
+
+![nVidia model](./images/nvidia%20model.png)
+
+First I reproduced this model as depicted in the image - with three 5x5 convolution layers, two 3x3 convolution layers, and three fully-connected layers - and as described in the paper text - including converting from RGB to YUV color space, and 2x2 striding on the 5x5 convolutional layers. The paper does not mention any sort of activation function or means of mitigating overfitting, so I began with `tanh` activation functions on each fully-connected layer, and dropout (with a keep probability of 0.5) between the two sets of convolution layers. 
+
+### 2. Loading and Preprocessing
+
+In training mode, the simulator produces three images per frame while recording corresponding to left-, right-, and center-mounted cameras, each giving a different perspective of the track ahead. The simulator also produces a `csv` file which includes file paths for each of these images, along with steering angle, throttle, brake, and speed for each frame. My algorithm loads the file paths for all three camera views for each frame, along with the angle (adjusted by +0.25 for the left frame and -0.25 for the right), into two numpy arrays `image_paths` and `angles`.
+
+Images produced by the simulator in training mode are 320x160, and therefore require preprocessing prior to being fed to the CNN because it expects input images to be size 200x66. To achieve this, I cropped the bottom 20 pixels and the top 35 pixels (although this number later changed) from the image and then resized it to 200x66. I also applied a subtle Gaussian blur and converted from RGB to YUV color space. Because `drive.py` uses the same CNN model to predict steering angles in real time, it requires the same image preprocessing (**Note, however: using `cv2.imread`, as `model.py` does, reads images in BGR, while images received by `drive.py` from the simulator are RGB, and thus require different color space conversion**).
+
+### 3. Jitter
+
+To minimize the model's tendency to overfit to the conditions of the test track, images are "jittered" before being fed to the CNN. The jittering (implemented using the method `random_distort`) consists of a randomized brightness adjustment, a randomized shadow, and a randomized horizon shift. The shadow effect is simply a darkening of a random rectangular portion of the image, starting at either the left or right edge and spanning the height of the image. The horizon shift applies a perspective transform beginning at the horizon line (at roughly 2/5 of the height) and shifting it up or down randomly by up to 1/8 of the image height. The horizon shift is meant to mimic the hilly conditions of the challenge track. The effects of the jitter can be observed in the sample below:
+
+![jittering output](./images/sanity-check-take-4.gif?raw=true "Jitter Output")
+
+### 4. Distribution Adjustment 
+
+
 
 - removing most ~0 angle data points to get a more uniform distribution of angles
 - implementing generator
