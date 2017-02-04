@@ -37,9 +37,9 @@ def displayCV2(img):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-def process_img_for_video(image, angle, pred_angle, frame):
+def process_img_for_visualization(image, angle, pred_angle, frame):
     '''
-    Used by visualize_dataset method to format image prior to adding to video
+    Used by visualize_dataset method to format image prior to displaying
     '''    
     font = cv2.FONT_HERSHEY_SIMPLEX
     img = cv2.cvtColor(image, cv2.COLOR_YUV2BGR)
@@ -56,13 +56,13 @@ def process_img_for_video(image, angle, pred_angle, frame):
     
 def visualize_dataset(X,y,y_pred=None):
     '''
-    format the data from the dataset (image, steering angle) and place it into a video file 
+    format the data from the dataset (image, steering angle) and display
     '''
     for i in range(len(X)):
         if y_pred is not None:
-            img = process_img_for_video(X[i], y[i], y_pred[i], i)
+            img = process_img_for_visualization(X[i], y[i], y_pred[i], i)
         else: 
-            img = process_img_for_video(X[i], y[i], None, i)
+            img = process_img_for_visualization(X[i], y[i], None, i)
         displayCV2(img)        
 
 def preprocess_image(img):
@@ -263,7 +263,7 @@ print('Test:', image_paths_test.shape, angles_test.shape)
 ###### ConvNet Definintion ######
 
 # for debugging purposes - don't want to mess with the model if just checkin' the data
-just_checkin_the_data = True
+just_checkin_the_data = False
 
 if not just_checkin_the_data:
     model = Sequential()
