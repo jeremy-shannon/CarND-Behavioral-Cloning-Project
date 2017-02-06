@@ -18,7 +18,7 @@ The challenge of this project is not only developing a CNN model that is able to
 
 ### 1. Base Model and Adjustments
 
-<img src="./images/nvidia_model.png?raw=true" style="float: right; padding: 20px; max-width: 400px">
+<img src="./images/nVidia_model.png?raw=true" style="float: right; padding: 20px; max-width: 400px">
 
 The project instructions from Udacity suggest starting from a known self-driving car model and provided a link to the [nVidia model](https://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf) (and later in the student forum, the [comma.ai model](https://github.com/commaai/research/blob/master/train_steering_model.py)) - the diagram to the right is a depiction of the nVidia model.
 
