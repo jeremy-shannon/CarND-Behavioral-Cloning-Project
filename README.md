@@ -48,7 +48,7 @@ The `process_img_for_visualization` method accepts an image input, float `angle`
 
 <img src="./images/data_distribution_before_3.png?raw=true" style="float: right; padding: 20px; max-width: 400px">
 
-### 6. Distribution Adjustment 
+### 6. Data Distribution Flattening 
 
 Because the test track includes long sections with very slight or no curvature, the data captured from it tends to be heavily skewed toward low and zero turning angles. This creates a problem for the neural network, which then becomes biased toward driving in a straight line and can become easily confused by sharp turns. The distribution of the input data can be observed to the right, the black line represents what would be a uniform distribution of the data points.
 
@@ -64,7 +64,7 @@ The resulting data distribution can be seen in the chart to the right. The distr
 
 When working with datasets that have a large memory footprint (large quantities of image data, in particular) Keras python generators are a convenient way to load the dataset one batch at a time rather than loading it all at once. Although this was not a problem for my implementation, because the project rubric made mention of it I felt compelled to give it a try. 
 
-The generator `generate_training_data` accepts as parameters a numpy array of strings `image_paths`, a numpy array of floats `angles`, an integer `batch_size` (default of 128), and a boolean `validation_flag` (default of `False`). Loading the numpy arrays `image_paths` (string) and `angles` (float) from the csv file, as well as adjusting the data distribution (see "Distribution Adjustment," above) and splitting the data into training and test sets, is still done in the main program. 
+The generator `generate_training_data` accepts as parameters a numpy array of strings `image_paths`, a numpy array of floats `angles`, an integer `batch_size` (default of 128), and a boolean `validation_flag` (default of `False`). Loading the numpy arrays `image_paths` (string) and `angles` (float) from the csv file, as well as adjusting the data distribution (see "Data Distribution Flattening," above) and splitting the data into training and test sets, is still done in the main program. 
 
 `generate_training_data` shuffles `image_paths` and `angles`, and for each pair it reads the image referred to by the path using `cv2.imread`. It then calls `preprocess_image` and `random_distort` (if `validation_flag` is `False`) to preprocess and jitter the image. If the magnitude of the steering angle is greater than 0.33, another image is produced which is the mirror image of the original using `cv2.flip` and the angle is inverted - this helps to reduce bias toward low and zero turning angles, as well as balance out the instance of higher angles in each direction so neither left nor right turning angles become overrepresented. Each of the produced images and corresponding angles is added to a list and when the lengths of the lists reach `batch_size` the lists are converted to numpy arrays and yielded to the calling generator from the model. Finally, the lists are reset to allow another batch to be built and `image_paths` and `angles` are again shuffled.
 
@@ -87,11 +87,16 @@ Some other strategies implemented to combat overfitting and otherwise attempt to
 - Removing `tanh` activations on fully-connected layers and adding `ELU` activations to all model layers, convolutional and fully-connected
 These strategies did, indeed, result in less bouncing back and forth between the sides of the road, particularly on the test track where the model was most likely to overfit to the recovery data.
 
-### 11. Further Data Distribution Adjustment
+### 11. Further Data Distribution Flattening
 
-At one point, I had decided I might be throwing out too much of my data trying to achieve a more uniform distribution. So instead of discarding data points until the distribution for a bin reaches the average for all bins, I made the target *twice* the average for all bins. The resulting distribution can be seen in the chart below on the left. This resulted in a noticeable bias toward driving straight, particularly on the challenge track. The consensus from the nanodegree community was that 
+At one point, I had decided I might be throwing out too much of my data trying to achieve a more uniform distribution. So instead of discarding data points until the distribution for a bin reaches the would-be average for all bins, I made the target *twice* the would-be average for all bins. The resulting distribution can be seen in the chart below on the left. This resulted in a noticeable bias toward driving straight, particularly on the challenge track. 
 
-<img src="./images/data_distribution_after_3.png?raw=true" style="float: left; padding: 0,20; max-width: 50%">
-<img src="./images/data_distribution_after_4.png?raw=true" style="float: right; padding: 0,20; max-width: 50%">
+The consensus from the nanodegree community was that underperforming on the challenge track most likely meant that there was not a high enough frequency of higher steering angle data points in the dataset. I once again adjusted the flattening algorithm, setting target maxiumum count for each bin to *half* of the would-be average for all bins. The histogram depicting the results of this adjustment can be seen in the chart below and to the right.
 
-  
+<img src="./images/data_distribution_after_3.png?raw=true" style="float: left; padding: 20,0; max-width: 50%">
+<img src="./images/data_distribution_after_4.png?raw=true" style="float: right; padding: 20,0; max-width: 50%">
+<div style="float: left;">
+
+## Results 
+
+These strategies resulted in a 
