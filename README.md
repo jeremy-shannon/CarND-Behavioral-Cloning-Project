@@ -36,9 +36,9 @@ Images produced by the simulator in training mode are 320x160, and therefore req
 
 ### 4. Jitter
 
-To minimize the model's tendency to overfit to the conditions of the test track, images are "jittered" before being fed to the CNN. The jittering (implemented using the method `random_distort`) consists of a randomized brightness adjustment, a randomized shadow, and a randomized horizon shift. The shadow effect is simply a darkening of a random rectangular portion of the image, starting at either the left or right edge and spanning the height of the image. The horizon shift applies a perspective transform beginning at the horizon line (at roughly 2/5 of the height) and shifting it up or down randomly by up to 1/8 of the image height. The horizon shift is meant to mimic the hilly conditions of the challenge track. The effects of the jitter can be observed in the sample to the right.
+To minimize the model's tendency to overfit to the conditions of the test track, images are "jittered" before being fed to the CNN. The jittering (implemented using the method `random_distort`) consists of a randomized brightness adjustment, a randomized shadow, and a randomized horizon shift. The shadow effect is simply a darkening of a random rectangular portion of the image, starting at either the left or right edge and spanning the height of the image. The horizon shift applies a perspective transform beginning at the horizon line (at roughly 2/5 of the height) and shifting it up or down randomly by up to 1/8 of the image height. The horizon shift is meant to mimic the hilly conditions of the challenge track. The effects of the jitter can be observed in the sample below.
 
-<img src="./images/sanity-check-take-4.gif?raw=true" style="float: right; padding: 20px;">
+<img src="./images/sanity-check-take-4.gif?raw=true">
 
 ### 5. Data Visualization
 
@@ -46,17 +46,17 @@ An important step in producing data for the model, espeically when preprocessing
 
 The `process_img_for_visualization` method accepts an image input, float `angle`, float `pred_angle`, and integer `frame`, and it returns an annotated image ready for display. It is used by the `visualize_dataset` method to format an image prior to displaying. It converts the image colorspace from YUV back to the original BGR, applies text the the image representing the steering angle and frame number (within the batch to be visualized), and applies lines representing the steering angle and the model-predicted steering angle (if available) to the image.
 
-<img src="./images/data_distribution_before_3.png?raw=true" style="float: right; padding: 20px; max-width: 400px">
-
 ### 6. Data Distribution Flattening 
 
-Because the test track includes long sections with very slight or no curvature, the data captured from it tends to be heavily skewed toward low and zero turning angles. This creates a problem for the neural network, which then becomes biased toward driving in a straight line and can become easily confused by sharp turns. The distribution of the input data can be observed to the right, the black line represents what would be a uniform distribution of the data points.
+Because the test track includes long sections with very slight or no curvature, the data captured from it tends to be heavily skewed toward low and zero turning angles. This creates a problem for the neural network, which then becomes biased toward driving in a straight line and can become easily confused by sharp turns. The distribution of the input data can be observed below, the black line represents what would be a uniform distribution of the data points.
+
+<img src="./images/data_distribution_before_3.png?raw=true" width="400px">
 
 To reduce the occurrence of low and zero angle data points, I first chose a number of bins (I decided upon 23) and produced a histogram of the turning angles using `numpy.histogram`. I also computed the average number of samples per bin (`avg_samples_per_bin` - what would be a uniform distribution) and plotted them together. Next, I determined a "keep probability" (`keep_prob`) for the samples belonging to each bin. That keep probability is 1.0 for bins that contain less than `avg_samples_per_bin`, and for other bins the keep probability is calculated to be the number of samples for that bin divided by `avg_samples_per_bin` (for example, if a bin contains twice the average number of data points its keep probability will be 0.5). Finally, I removed random data points from the data set with a frequency of `(1 - keep_prob)`. 
 
-<img src="./images/data_distribution_after.png?raw=true" style="float: right; padding: 20px; max-width: 400px">
+The resulting data distribution can be seen in the chart below. The distribution is not uniform overall, but it is much closer to uniform for lower and zero turning angles.
 
-The resulting data distribution can be seen in the chart to the right. The distribution is not uniform overall, but it is much closer to uniform for lower and zero turning angles.
+<img src="./images/data_distribution_after.png?raw=true" width="400px">
 
 *After implementing the above strategies, the resulting model performed very well - driving reliably around the test track multiple times. It also navigated the challenge track quite well, until it encountered an especially sharp turn. The following strategies were adopted primarily to improve the model enough to drive the length of the challenge track, although not all of the them contributed to that goal directly.*
 
@@ -76,9 +76,9 @@ Inspired by [David Ventimiglia's post](http://davidaventimiglia.com/carnd_behavi
 
 ### 9. Cleaning the dataset
 
-<img src="./images/sanity-check-take-5.gif?raw=true" style="float: right; padding: 20px;">
+Another mostly unsuccessful attempt to improve the model's performace was inspired by [David Brailovsky's post](https://medium.freecodecamp.com/recognizing-traffic-lights-with-deep-learning-23dae23287cc#.linb6gh1d) describing his competition-winning model for identifying traffic signals. In it, he discovered that the model performed especially poorly on certain data points, and then found those data points to be mislabeled in several cases. I created `clean.py` which leverages parts of both `model.py` and `drive.py` to display frames from the dataset on which the model performs the worst. The intent was to manually adjust the steering angles for the mislabeled frames, but this approach was tedious, and often the problem was with the model's prediction and not the label or the ideal ground truth lay somewhere between the two. A sample of the visualization (including ground truth steering angles in greeen and predicted steering angles in red) is shown below.
 
-Another mostly unsuccessful attempt to improve the model's performace was inspired by [David Brailovsky's post](https://medium.freecodecamp.com/recognizing-traffic-lights-with-deep-learning-23dae23287cc#.linb6gh1d) describing his competition-winning model for identifying traffic signals. In it, he discovered that the model performed especially poorly on certain data points, and then found those data points to be mislabeled in several cases. I created `clean.py` which leverages parts of both `model.py` and `drive.py` to display frames from the dataset on which the model performs the worst. The intent was to manually adjust the steering angles for the mislabeled frames, but this approach was tedious, and often the problem was with the model's prediction and not the label or the ideal ground truth lay somewhere between the two.
+<img src="./images/sanity-check-take-5.gif?raw=true">
 
 ### 10. Futher Model Adjustments
 
@@ -89,13 +89,13 @@ These strategies did, indeed, result in less bouncing back and forth between the
 
 ### 11. Further Data Distribution Flattening
 
-At one point, I had decided I might be throwing out too much of my data trying to achieve a more uniform distribution. So instead of discarding data points until the distribution for a bin reaches the would-be average for all bins, I made the target *twice* the would-be average for all bins. The resulting distribution can be seen in the chart below on the left. This resulted in a noticeable bias toward driving straight, particularly on the challenge track. 
+At one point, I had decided I might be throwing out too much of my data trying to achieve a more uniform distribution. So instead of discarding data points until the distribution for a bin reaches the would-be average for all bins, I made the target *twice* the would-be average for all bins. The resulting distribution can be seen in the chart below. This resulted in a noticeable bias toward driving straight, particularly on the challenge track. 
 
-The consensus from the nanodegree community was that underperforming on the challenge track most likely meant that there was not a high enough frequency of higher steering angle data points in the dataset. I once again adjusted the flattening algorithm, setting target maxiumum count for each bin to *half* of the would-be average for all bins. The histogram depicting the results of this adjustment can be seen in the chart below and to the right.
+<img src="./images/data_distribution_after_3.png?raw=true" width="400px">
 
-<img src="./images/data_distribution_after_3.png?raw=true" style="float: left; padding: 20,0; max-width: 50%">
-<img src="./images/data_distribution_after_4.png?raw=true" style="float: right; padding: 20,0; max-width: 50%">
-<div style="float: left;">
+The consensus from the nanodegree community was that underperforming on the challenge track most likely meant that there was not a high enough frequency of higher steering angle data points in the dataset. I once again adjusted the flattening algorithm, setting target maxiumum count for each bin to *half* of the would-be average for all bins. The histogram depicting the results of this adjustment can be seen in the chart below.
+
+<img src="./images/data_distribution_after_4.png?raw=true" width="400px">
 
 ## Results 
 
