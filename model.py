@@ -39,7 +39,7 @@ def displayCV2(img):
 
 def process_img_for_visualization(image, angle, pred_angle, frame):
     '''
-    Used by visualize_dataset method to format image prior to displaying
+    Used by visualize_dataset method to format image prior to displaying. Converts colorspace back to original BGR, applies text to display steering angle and frame number (within batch to be visualized), and applies lines representing steering angle and model-predicted steering angle (if available) to image.
     '''    
     font = cv2.FONT_HERSHEY_SIMPLEX
     img = cv2.cvtColor(image, cv2.COLOR_YUV2BGR)
@@ -119,9 +119,8 @@ def random_distort(img, angle):
 
 def generate_training_data(image_paths, angles, batch_size=128, validation_flag=False):
     '''
-    method for the model training data generator to load, process, and distort images
-    if 'validation_flag' is true the image is not distorted, also enforces choosing a uniform distribution of
-    left, right, and center steering angles (left: < -0.33, right: > 0.33, center: between -0.33 and 0.33)
+    method for the model training data generator to load, process, and distort images, then yield them to the
+    model. if 'validation_flag' is true the image is not distorted. also flips images with turning angle magnitudes of greater than 0.33, as to give more weight to them and mitigate bias toward low and zero turning angles
     '''
     image_paths, angles = shuffle(image_paths, angles)
     X,y = ([],[])
@@ -152,7 +151,7 @@ def generate_training_data(image_paths, angles, batch_size=128, validation_flag=
 
 def generate_training_data_for_visualization(image_paths, angles, batch_size=20, validation_flag=False):
     '''
-    method for the model training data generator to load, process, and distort images
+    method for loading, processing, and distorting images
     if 'validation_flag' is true the image is not distorted
     '''
     X = []
