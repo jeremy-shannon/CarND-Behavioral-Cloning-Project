@@ -8,9 +8,9 @@
 
 The object of this project is to apply deep learning principles to a simulated driving application. The simulator includes both training and autonomous modes, and two tracks on which the car can be driven - I will refer to these as the "test track" (which is the track from which training data is collected and on which the output is evaluated for class credit) and the "challenge track" (which includes hills, tight turns, and other features not included in the test track). 
 
-In training mode, user generated driving data is collected in the form of simulated car dashboard camera images and conrol data (steering angle, throttle, brake, speed). Using the Keras deep learning framework, a convolutional neural network (CNN) model is produced using the collected driving data (see `model.py`) and saved as `model.json` (with CNN weights saved as `model.h5`). 
+In training mode, user generated driving data is collected in the form of simulated car dashboard camera images and control data (steering angle, throttle, brake, speed). Using the Keras deep learning framework, a convolutional neural network (CNN) model is produced using the collected driving data (see `model.py`) and saved as `model.json` (with CNN weights saved as `model.h5`). 
 
-Using the saved model, drive.py (provided by Udacity, but amended slightly to ensure compatiblity with the CNN model and to finetune conrols) starts up a local server to control the simulator in autonomous mode. The command to run the server is `python drive.py model.json`; the model weights are retrieved using the same name but the extension `.h5` (i.e. `model.h5`).
+Using the saved model, drive.py (provided by Udacity, but amended slightly to ensure compatibility with the CNN model and to fine tune controls) starts up a local server to control the simulator in autonomous mode. The command to run the server is `python drive.py model.json`; the model weights are retrieved using the same name but the extension `.h5` (i.e. `model.h5`).
 
 The challenge of this project is not only developing a CNN model that is able to drive the car around the test track without leaving the track boundary, but also feeding training data to the CNN in a way that allows the model to generalize well enough to drive in an environment it has not yet encountered (i.e. the challenge track). 
 
@@ -26,7 +26,7 @@ First I reproduced this model as depicted in the image - including image normali
 
 ### 2. Collecting Additional Driving Data
 
-Udacity provides a dataset that can be used alone to produce a working model. However, students are encouraged (and let's admit, it's more fun) to collect our own. Particulaly, Udacity encourages including "recovery" data while training. This means that data should be captured starting from the point of approaching the edge of the track (perhaps nearly missing a turn and almost driving off the track) and recording the recovery process to give the model a chance to learn recovery behavior. It's easy enough for experienced humans to drive the car reliably around the track, but if the model has never experienced being too close to the edge and then finds itself in just that situation it won't know how to react.
+Udacity provides a dataset that can be used alone to produce a working model. However, students are encouraged (and let's admit, it's more fun) to collect our own. Particularly, Udacity encourages including "recovery" data while training. This means that data should be captured starting from the point of approaching the edge of the track (perhaps nearly missing a turn and almost driving off the track) and recording the recovery process to give the model a chance to learn recovery behavior. It's easy enough for experienced humans to drive the car reliably around the track, but if the model has never experienced being too close to the edge and then finds itself in just that situation it won't know how to react.
 
 ### 3. Loading and Preprocessing
 
@@ -42,7 +42,7 @@ To minimize the model's tendency to overfit to the conditions of the test track,
 
 ### 5. Data Visualization
 
-An important step in producing data for the model, espeically when preprocessing (and even more so when applying any sort of augmentation or jitter) the data, is to visualize it. This acts as a sort of sanity check to verify that the preprocessing is not fundamentally flawed. Flawed data will almost certainly act to confuse the model and result in unacceptable performance. For this reason, I included a method 'visualize_dataset', which accepts a numpy array of images `X`, a numpy array of floats `y` (steering angle labels), and an optional numpy array of floats `y_pred` (steering angle predictions from the model). This method calls `process_img_for_visualization` for each image and label in the arrays.
+An important step in producing data for the model, especially when preprocessing (and even more so when applying any sort of augmentation or jitter) the data, is to visualize it. This acts as a sort of sanity check to verify that the preprocessing is not fundamentally flawed. Flawed data will almost certainly act to confuse the model and result in unacceptable performance. For this reason, I included a method 'visualize_dataset', which accepts a numpy array of images `X`, a numpy array of floats `y` (steering angle labels), and an optional numpy array of floats `y_pred` (steering angle predictions from the model). This method calls `process_img_for_visualization` for each image and label in the arrays.
 
 The `process_img_for_visualization` method accepts an image input, float `angle`, float `pred_angle`, and integer `frame`, and it returns an annotated image ready for display. It is used by the `visualize_dataset` method to format an image prior to displaying. It converts the image colorspace from YUV back to the original BGR, applies text the the image representing the steering angle and frame number (within the batch to be visualized), and applies lines representing the steering angle and the model-predicted steering angle (if available) to the image.
 
@@ -76,11 +76,11 @@ Inspired by [David Ventimiglia's post](http://davidaventimiglia.com/carnd_behavi
 
 ### 9. Cleaning the dataset
 
-Another mostly unsuccessful attempt to improve the model's performance was inspired by [David Brailovsky's post](https://medium.freecodecamp.com/recognizing-traffic-lights-with-deep-learning-23dae23287cc#.linb6gh1d) describing his competition-winning model for identifying traffic signals. In it, he discovered that the model performed especially poorly on certain data points, and then found those data points to be mislabeled in several cases. I created `clean.py` which leverages parts of both `model.py` and `drive.py` to display frames from the dataset on which the model performs the worst. The intent was to manually adjust the steering angles for the mislabeled frames, but this approach was tedious, and often the problem was with the model's prediction and not the label or the ideal ground truth lay somewhere between the two. A sample of the visualization (including ground truth steering angles in greeen and predicted steering angles in red) is shown below.
+Another mostly unsuccessful attempt to improve the model's performance was inspired by [David Brailovsky's post](https://medium.freecodecamp.com/recognizing-traffic-lights-with-deep-learning-23dae23287cc#.linb6gh1d) describing his competition-winning model for identifying traffic signals. In it, he discovered that the model performed especially poorly on certain data points, and then found those data points to be mislabeled in several cases. I created `clean.py` which leverages parts of both `model.py` and `drive.py` to display frames from the dataset on which the model performs the worst. The intent was to manually adjust the steering angles for the mislabeled frames, but this approach was tedious, and often the problem was with the model's prediction and not the label or the ideal ground truth lay somewhere between the two. A sample of the visualization (including ground truth steering angles in green and predicted steering angles in red) is shown below.
 
 <img src="./images/sanity-check-take-5.gif?raw=true">
 
-### 10. Futher Model Adjustments
+### 10. Further Model Adjustments
 
 Some other strategies implemented to combat overfitting and otherwise attempt to get the car to drive more smoothly are (these were implemented mostly due to consensus from the nanodegree community, and not necessarily all at once):
 - Removing dropout layers and adding L2 regularization (`lambda` of 0.001) to all model layers, convolutional and fully-connected
@@ -98,18 +98,16 @@ At one point, I had decided I might be throwing out too much of my data trying t
 
 <img src="./images/data_distribution_after_3.png?raw=true" width="400px">
 
-The consensus from the nanodegree community was that underperforming on the challenge track most likely meant that there was not a high enough frequency of higher steering angle data points in the dataset. I once again adjusted the flattening algorithm, setting target maxiumum count for each bin to *half* of the would-be average for all bins. The histogram depicting the results of this adjustment can be seen in the chart below. (*Note: the counts for the bins differ from the chart above because the dataset for the chart below includes both Udacity's and my own data.*)
+The consensus from the nanodegree community was that underperforming on the challenge track most likely meant that there was not a high enough frequency of higher steering angle data points in the dataset. I once again adjusted the flattening algorithm, setting target maximum count for each bin to *half* of the would-be average for all bins. The histogram depicting the results of this adjustment can be seen in the chart below. (*Note: the counts for the bins differ from the chart above because the dataset for the chart below includes both Udacity's and my own data.*)
 
 <img src="./images/data_distribution_after_4.png?raw=true" width="400px">
 
 ## Results 
 
-These strategies resulted in a model that peformed well on both test and challenge tracks. The final dataset was a combination of Udacity's and my own and included a total of 59,664 data points. From these, only 17,350 remained after distribution flattening, and this set was further split into a training set of 16,482 (95%) data points and a test set of 868 (5%) data points. The validation data for the model is pulled from the training set, but doesn't undergo any jitter. The model architecture is described in the paragraphs above, but reiterated in the image below:
+These strategies resulted in a model that performed well on both test and challenge tracks. The final dataset was a combination of Udacity's and my own and included a total of 59,664 data points. From these, only 17,350 remained after distribution flattening, and this set was further split into a training set of 16,482 (95%) data points and a test set of 868 (5%) data points. The validation data for the model is pulled from the training set, but doesn't undergo any jitter. The model architecture is described in the paragraphs above, but reiterated in the image below:
 
 <img src="./images/model_diagram.jpeg?raw=true" width="400px">
 
-## Conclusion and Diuscussion
+## Conclusion and Discussion
 
-This project - along with every other exercise in machine learning, it would seem - very much (ahem) *drove* home the point that it really is (to paraphrase Puff Daddy) *all about the data*. Making changes to the model rarely seemed to have quite the impact that a change to the fundamental makeup of the training data would have.  
-
-... could fiddle with it forever...
+This project - along with every other exercise in machine learning, it would seem - very much (ahem) *drove* home the point that it really is (to paraphrase Puff Daddy) *all about the data*. Making changes to the model rarely seemed to have quite the impact that a change to the fundamental makeup of the training data would have. I enjoyed this project thoroughly and could easily spend hours upon hours tuning the data and model to perform optimally on both tracks, but to manage my time effectively I chose to conclude my efforts as soon as the model performed satisfactorily on both tracks. I fully plan to revisit this project when time permits.
