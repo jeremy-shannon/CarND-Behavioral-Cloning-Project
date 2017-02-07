@@ -98,7 +98,7 @@ At one point, I had decided I might be throwing out too much of my data trying t
 
 <img src="./images/data_distribution_after_3.png?raw=true" width="400px">
 
-The consensus from the nanodegree community was that underperforming on the challenge track most likely meant that there was not a high enough frequency of higher steering angle data points in the dataset. I once again adjusted the flattening algorithm, setting target maxiumum count for each bin to *half* of the would-be average for all bins. The histogram depicting the results of this adjustment can be seen in the chart below.
+The consensus from the nanodegree community was that underperforming on the challenge track most likely meant that there was not a high enough frequency of higher steering angle data points in the dataset. I once again adjusted the flattening algorithm, setting target maxiumum count for each bin to *half* of the would-be average for all bins. The histogram depicting the results of this adjustment can be seen in the chart below. (*Note: the counts for the bins differ from the chart above because the dataset for the chart below includes both Udacity's and my own data.*)
 
 <img src="./images/data_distribution_after_4.png?raw=true" width="400px">
 
@@ -109,3 +109,7 @@ These strategies resulted in a model that peformed well on both test and challen
 <img src="./images/model_diagram.jpeg?raw=true" width="400px">
 
 ## Conclusion and Diuscussion
+
+This project - along with every other exercise in machine learning, it would seem - very much (ahem) *drove* home the point that it really is (to paraphrase Puff Daddy) *all about the data*. Making changes to the model rarely seemed to have quite the impact that a change to the fundamental makeup of the training data would have.  
+
+... could fiddle with it forever...
