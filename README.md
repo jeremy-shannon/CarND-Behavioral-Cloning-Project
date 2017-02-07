@@ -22,7 +22,7 @@ The project instructions from Udacity suggest starting from a known self-driving
 
 <img src="./images/nVidia_model.png?raw=true" width="400px">
 
-First I reproduced this model as depicted in the image - including image normalization using a Keras Lambda function, with three 5x5 convolution layers, two 3x3 convolution layers, and three fully-connected layers - and as described in the paper text - including converting from RGB to YUV color space, and 2x2 striding on the 5x5 convolutional layers. The paper does not mention any sort of activation function or means of mitigating overfitting, so I began with `tanh` activation functions on each fully-connected layer, and dropout (with a keep probability of 0.5) between the two sets of convolution layers and after the first fully-connected layer. 
+First I reproduced this model as depicted in the image - including image normalization using a Keras Lambda function, with three 5x5 convolution layers, two 3x3 convolution layers, and three fully-connected layers - and as described in the paper text - including converting from RGB to YUV color space, and 2x2 striding on the 5x5 convolutional layers. The paper does not mention any sort of activation function or means of mitigating overfitting, so I began with `tanh` activation functions on each fully-connected layer, and dropout (with a keep probability of 0.5) between the two sets of convolution layers and after the first fully-connected layer. The Adam optimizer was chosen with default parameters and the chosen loss function was mean squared error (MSE). The final layer (depicted "output" in the diagram) is a fully-connected layer with a single neuron.
 
 ### 2. Collecting Additional Driving Data
 
@@ -76,7 +76,7 @@ Inspired by [David Ventimiglia's post](http://davidaventimiglia.com/carnd_behavi
 
 ### 9. Cleaning the dataset
 
-Another mostly unsuccessful attempt to improve the model's performace was inspired by [David Brailovsky's post](https://medium.freecodecamp.com/recognizing-traffic-lights-with-deep-learning-23dae23287cc#.linb6gh1d) describing his competition-winning model for identifying traffic signals. In it, he discovered that the model performed especially poorly on certain data points, and then found those data points to be mislabeled in several cases. I created `clean.py` which leverages parts of both `model.py` and `drive.py` to display frames from the dataset on which the model performs the worst. The intent was to manually adjust the steering angles for the mislabeled frames, but this approach was tedious, and often the problem was with the model's prediction and not the label or the ideal ground truth lay somewhere between the two. A sample of the visualization (including ground truth steering angles in greeen and predicted steering angles in red) is shown below.
+Another mostly unsuccessful attempt to improve the model's performance was inspired by [David Brailovsky's post](https://medium.freecodecamp.com/recognizing-traffic-lights-with-deep-learning-23dae23287cc#.linb6gh1d) describing his competition-winning model for identifying traffic signals. In it, he discovered that the model performed especially poorly on certain data points, and then found those data points to be mislabeled in several cases. I created `clean.py` which leverages parts of both `model.py` and `drive.py` to display frames from the dataset on which the model performs the worst. The intent was to manually adjust the steering angles for the mislabeled frames, but this approach was tedious, and often the problem was with the model's prediction and not the label or the ideal ground truth lay somewhere between the two. A sample of the visualization (including ground truth steering angles in greeen and predicted steering angles in red) is shown below.
 
 <img src="./images/sanity-check-take-5.gif?raw=true">
 
@@ -85,9 +85,14 @@ Another mostly unsuccessful attempt to improve the model's performace was inspir
 Some other strategies implemented to combat overfitting and otherwise attempt to get the car to drive more smoothly are (these were implemented mostly due to consensus from the nanodegree community, and not necessarily all at once):
 - Removing dropout layers and adding L2 regularization (`lambda` of 0.001) to all model layers, convolutional and fully-connected
 - Removing `tanh` activations on fully-connected layers and adding `ELU` activations to all model layers, convolutional and fully-connected
+- Adjust learning rate of Adam optimizer to 0.0001 (rather than the default of 0.001)
 These strategies did, indeed, result in less bouncing back and forth between the sides of the road, particularly on the test track where the model was most likely to overfit to the recovery data.
 
-### 11. Further Data Distribution Flattening
+### 11. Model Checkpoints
+
+One useful tool built into the Keras framework is the ability to use callbacks to perform tasks along the way through the model learning process. I chose to implement checkpoints to save the model weights at the end of each epoch. In a more typical application of neural networks, it might make more sense to simply stop the learning process once the loss stops improving from one epoch to the next. However, in this application the loss was not an entirely reliable indicator of model performance, saving model weights at the end of each epoch is something of a buy-one-get-X-free each time the training process runs. In the end, it was the weights from the third epoch of training that performed best and completed both test and challenge tracks.
+
+### 12. Further Data Distribution Flattening
 
 At one point, I had decided I might be throwing out too much of my data trying to achieve a more uniform distribution. So instead of discarding data points until the distribution for a bin reaches the would-be average for all bins, I made the target *twice* the would-be average for all bins. The resulting distribution can be seen in the chart below. This resulted in a noticeable bias toward driving straight, particularly on the challenge track. 
 
@@ -99,4 +104,8 @@ The consensus from the nanodegree community was that underperforming on the chal
 
 ## Results 
 
-These strategies resulted in a 
+These strategies resulted in a model that peformed well on both test and challenge tracks. The final dataset was a combination of Udacity's and my own and included a total of 59,664 data points. From these, only 17,350 remained after distribution flattening, and this set was further split into a training set of 16,482 (95%) data points and a test set of 868 (5%) data points. The validation data for the model is pulled from the training set, but doesn't undergo any jitter. The model architecture is described in the paragraphs above, but reiterated in the image below:
+
+<img src="./images/model_diagram.jpeg?raw=true" width="400px">
+
+## Conclusion and Diuscussion
