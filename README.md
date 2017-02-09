@@ -114,8 +114,10 @@ These strategies resulted in a model that performed well on both test and challe
 
 This project - along with most every other exercise in machine learning, it would seem - very much reiterated that it really is *all about the data*. Making changes to the model rarely seemed to have quite the impact that a change to the fundamental makeup of the training data typically had. 
 
+I could easily spend hours upon hours tuning the data and model to perform optimally on both tracks, but to manage my time effectively I chose to conclude my efforts as soon as the model performed satisfactorily on both tracks. I fully plan to revisit this project when time permits.
+
 One way that I would like to improve my implementation is related to the distribution flattening scheme. As it is currently implemented, a very large chunk of data is thrown out, never to be seen again. I find this bothersome, and I feel that wasting data like this (even if it is mostly zero/near-zero steering angles) is a missed opportunity to train a model that can better generalize. In the future, I would like to pass the full dataset (`image_paths` and `angles`) to the generator which flattens the distribution itself, throwing out a different portion of the data each epoch or batch.
 
 I would also like to revisit implementing a more agressive crop to the images before feeding them to the neural net. Another nanodegree student achieved good model performance in a neural net with only 63 parameters. Such a small neural net is desirable because it greatly reduces training time and can produce near real-time predictions, which is very important for a real-world self-driving car application.
 
-I enjoyed this project thoroughly and could easily spend hours upon hours tuning the data and model to perform optimally on both tracks, but to manage my time effectively I chose to conclude my efforts as soon as the model performed satisfactorily on both tracks. I fully plan to revisit this project when time permits.
+I enjoyed this project thoroughly and I'm very pleased with the results. Training the car to drive itself, with relatively little effort and virtually no explicit instruction, was extremely rewarding.
