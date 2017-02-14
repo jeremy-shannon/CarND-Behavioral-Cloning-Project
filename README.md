@@ -48,7 +48,7 @@ The `process_img_for_visualization` method accepts an image input, float `angle`
 
 ### 6. Data Distribution Flattening 
 
-Because the test track includes long sections with very slight or no curvature, the data captured from it tends to be heavily skewed toward low and zero turning angles. This creates a problem for the neural network, which then becomes biased toward driving in a straight line and can become easily confused by sharp turns. The distribution of the input data can be observed below, the black line represents what would be a uniform distribution of the data points.
+Because the test track includes long sections with very slight or no curvature, the data captured from it tends to be heavily skewed toward low and zero turning angles. This creates a problem for the neural network, which then becomes biased toward driving in a straight line and can become easily confused by sharp turns. The distribution of the input data can be observed below, the black line represents what would be a uniform distribution of the data points. 
 
 <img src="./images/data_distribution_before_3.png?raw=true" width="400px">
 
